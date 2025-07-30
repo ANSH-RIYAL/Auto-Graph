@@ -225,7 +225,7 @@ def get_analysis_status(analysis_id):
     """Get analysis status"""
     if analysis_id not in analysis_sessions:
         return jsonify({'error': 'Analysis not found'}), 404
-    
+        
     session_data = analysis_sessions[analysis_id]
     return jsonify({
         'status': session_data['status'],
@@ -246,7 +246,7 @@ def get_analysis_logs(analysis_id):
     """Get analysis logs"""
     if analysis_id not in analysis_sessions:
         return jsonify({'error': 'Analysis not found'}), 404
-    
+        
     session_data = analysis_sessions[analysis_id]
     return jsonify({
         'logs': session_data.get('logs', [])
@@ -257,7 +257,7 @@ def get_analysis_response(analysis_id):
     """Get complete analysis response"""
     if analysis_id not in analysis_sessions:
         return jsonify({'error': 'Analysis not found'}), 404
-    
+        
     session_data = analysis_sessions[analysis_id]
     
     response = {

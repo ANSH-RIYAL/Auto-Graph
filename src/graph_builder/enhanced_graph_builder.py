@@ -154,39 +154,150 @@ class EnhancedGraphBuilder:
         return hld_nodes
     
     def _create_enhanced_lld_nodes(self, parsing_result: Dict[str, Any]) -> Dict[str, GraphNode]:
-        """Create enhanced LLD nodes with semantic analysis."""
+        """Create enhanced LLD nodes with semantic analysis - grouped by logical containers."""
         lld_nodes = {}
+        
+        # Track logical groupings
+        logical_groups = {}
         
         for file_path, file_data in parsing_result['parsed_files'].items():
             semantic_result = self.semantic_results.get(file_path, {})
+            file_stem = Path(file_path).stem
             
-            # Create nodes for functions with semantic analysis
-            for func_name in file_data['functions']:
-                node_id = f"function_{func_name}_{Path(file_path).stem}"
-                lld_nodes[node_id] = GraphNode(
-                    id=node_id,
-                    name=func_name,
-                    type=NodeType.FUNCTION,
-                    level=NodeLevel.LLD,
-                    files=[file_path],
-                    functions=[func_name],
-                    metadata=self._create_enhanced_function_metadata(func_name, file_path, parsing_result, semantic_result)
-                )
-            
-            # Create nodes for classes with semantic analysis
+            # Group by classes first (classes are logical containers)
             for class_name in file_data['classes']:
-                node_id = f"class_{class_name}_{Path(file_path).stem}"
-                lld_nodes[node_id] = GraphNode(
-                    id=node_id,
-                    name=class_name,
-                    type=NodeType.CLASS,
-                    level=NodeLevel.LLD,
-                    files=[file_path],
-                    classes=[class_name],
-                    metadata=self._create_enhanced_class_metadata(class_name, file_path, parsing_result, semantic_result)
-                )
+                # Skip special methods and low-level functions
+                if self._should_skip_low_level_component(class_name):
+                    continue
+                    
+                node_id = f"class_{class_name}_{file_stem}"
+                
+                # Get all functions that belong to this class
+                class_functions = self._get_class_functions(class_name, file_data)
+                # Filter out low-level functions
+                filtered_functions = [f for f in class_functions if not self._should_skip_low_level_component(f)]
+                
+                if filtered_functions:  # Only create node if there are meaningful functions
+                    lld_nodes[node_id] = GraphNode(
+                        id=node_id,
+                        name=f"{class_name} Class",
+                        type=NodeType.CLASS,
+                        level=NodeLevel.LLD,
+                        files=[file_path],
+                        classes=[class_name],
+                        functions=filtered_functions,
+                        metadata=self._create_enhanced_class_metadata(class_name, file_path, parsing_result, semantic_result)
+                    )
+                    logical_groups[node_id] = {
+                        'type': 'class',
+                        'name': class_name,
+                        'functions': filtered_functions,
+                        'file': file_path
+                    }
+            
+            # Group standalone functions by their logical purpose
+            standalone_functions = [f for f in file_data['functions'] 
+                                  if not self._should_skip_low_level_component(f) 
+                                  and not self._is_function_in_class(f, file_data)]
+            
+            if standalone_functions:
+                # Group functions by their semantic purpose
+                function_groups = self._group_functions_by_purpose(standalone_functions, file_path, semantic_result)
+                
+                for group_name, group_functions in function_groups.items():
+                    if group_functions:  # Only create group if there are functions
+                        node_id = f"function_group_{group_name}_{file_stem}"
+                        lld_nodes[node_id] = GraphNode(
+                            id=node_id,
+                            name=f"{group_name} Functions",
+                            type=NodeType.FUNCTION_GROUP,
+                            level=NodeLevel.LLD,
+                            files=[file_path],
+                            functions=group_functions,
+                            metadata=self._create_enhanced_function_group_metadata(group_name, group_functions, file_path, parsing_result, semantic_result)
+                        )
+                        logical_groups[node_id] = {
+                            'type': 'function_group',
+                            'name': group_name,
+                            'functions': group_functions,
+                            'file': file_path
+                        }
         
         return lld_nodes
+    
+    def _should_skip_low_level_component(self, name: str) -> bool:
+        """Check if a component should be skipped (too low-level)."""
+        low_level_patterns = [
+            '__init__', '__str__', '__repr__', '__eq__', '__hash__',
+            '__getitem__', '__setitem__', '__delitem__', '__len__',
+            '__contains__', '__iter__', '__next__', '__enter__', '__exit__',
+            '__call__', '__getattr__', '__setattr__', '__delattr__',
+            '__getattribute__', '__new__', '__del__', '__slots__',
+            'get_', 'set_', 'is_', 'has_', 'add_', 'remove_', 'clear_',
+            'update_', 'reset_', 'init_', 'cleanup_', 'validate_'
+        ]
+        
+        name_lower = name.lower()
+        return any(pattern in name_lower for pattern in low_level_patterns)
+    
+    def _get_class_functions(self, class_name: str, file_data: Dict[str, Any]) -> List[str]:
+        """Get all functions that belong to a specific class."""
+        # This is a simplified approach - in a real implementation, you'd parse the AST
+        # to determine which functions belong to which class
+        # For now, we'll return all functions and let the semantic analysis help
+        return file_data.get('functions', [])
+    
+    def _is_function_in_class(self, function_name: str, file_data: Dict[str, Any]) -> bool:
+        """Check if a function is likely part of a class."""
+        # This is a simplified check - in reality, you'd need AST analysis
+        # For now, we'll assume functions with 'self' parameter or class-like naming are in classes
+        return any(class_name.lower() in function_name.lower() for class_name in file_data.get('classes', []))
+    
+    def _group_functions_by_purpose(self, functions: List[str], file_path: str, semantic_result: Dict[str, Any]) -> Dict[str, List[str]]:
+        """Group standalone functions by their logical purpose."""
+        groups = {
+            'Data Processing': [],
+            'Validation': [],
+            'Utility': [],
+            'Business Logic': [],
+            'Configuration': [],
+            'Other': []
+        }
+        
+        for func_name in functions:
+            func_lower = func_name.lower()
+            
+            # Categorize based on function name patterns
+            if any(word in func_lower for word in ['process', 'transform', 'convert', 'parse', 'format']):
+                groups['Data Processing'].append(func_name)
+            elif any(word in func_lower for word in ['validate', 'check', 'verify', 'test', 'assert']):
+                groups['Validation'].append(func_name)
+            elif any(word in func_lower for word in ['util', 'helper', 'format', 'clean', 'normalize']):
+                groups['Utility'].append(func_name)
+            elif any(word in func_lower for word in ['calculate', 'compute', 'analyze', 'generate', 'create']):
+                groups['Business Logic'].append(func_name)
+            elif any(word in func_lower for word in ['config', 'setup', 'init', 'load', 'save']):
+                groups['Configuration'].append(func_name)
+            else:
+                groups['Other'].append(func_name)
+        
+        # Remove empty groups
+        return {k: v for k, v in groups.items() if v}
+    
+    def _create_enhanced_function_group_metadata(self, group_name: str, functions: List[str], file_path: str, 
+                                               parsing_result: Dict[str, Any], semantic_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Create metadata for a function group."""
+        return {
+            'purpose': f"Group of {group_name.lower()} functions",
+            'complexity': ComplexityLevel.MEDIUM,
+            'dependencies': [],
+            'line_count': len(functions) * 10,  # Estimate
+            'file_size': 0,
+            'language': 'python',
+            'category': 'function_group',
+            'function_count': len(functions),
+            'group_type': group_name
+        }
     
     def _create_enhanced_graph_edges(self, parsing_result: Dict[str, Any], 
                                    hld_nodes: Dict[str, GraphNode], 

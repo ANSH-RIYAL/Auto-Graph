@@ -28,6 +28,7 @@ class NodeType(str, Enum):
     COMPONENT = "Component"
     FUNCTION = "Function"
     CLASS = "Class"
+    FUNCTION_GROUP = "Function_Group"
     UTILITY = "Utility"
     CONTROLLER = "Controller"
     MODEL = "Model"
