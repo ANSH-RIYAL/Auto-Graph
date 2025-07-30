@@ -339,8 +339,17 @@ function renderGraph() {
     const existingNodes = elements.graphContainer.querySelectorAll('.graph-node');
     existingNodes.forEach(node => node.remove());
     
-    // Create nodes
-    nodes.forEach(node => {
+    // Simple grid layout for spacing
+    const gridCols = Math.ceil(Math.sqrt(nodes.length));
+    const gridSpacingX = 180;
+    const gridSpacingY = 120;
+    nodes.forEach((node, i) => {
+        const col = i % gridCols;
+        const row = Math.floor(i / gridCols);
+        node.position = {
+            x: 60 + col * gridSpacingX,
+            y: 60 + row * gridSpacingY
+        };
         const nodeElement = createNodeElement(node);
         elements.graphContainer.appendChild(nodeElement);
     });
