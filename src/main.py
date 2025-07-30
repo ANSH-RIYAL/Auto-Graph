@@ -109,10 +109,10 @@ def save_results(result: dict, output_dir: str, format: str):
     graph_file = output_path / f"graph.{format}"
     with open(graph_file, 'w') as f:
         if format == 'json':
-            json.dump(result['graph'].dict(), f, indent=2, default=str)
+            json.dump(result['graph'].model_dump(), f, indent=2, default=str)
         else:
             # For now, just save as JSON even if YAML is requested
-            json.dump(result['graph'].dict(), f, indent=2, default=str)
+            json.dump(result['graph'].model_dump(), f, indent=2, default=str)
     
     # Save analysis report
     report_file = output_path / "analysis_report.json"
@@ -124,6 +124,28 @@ def save_results(result: dict, output_dir: str, format: str):
             'validation_issues': result.get('validation_issues', []),
             'timestamp': result['graph'].metadata.analysis_timestamp.isoformat() if result['graph'] else None
         }, f, indent=2, default=str)
+    
+    # Show export information if available
+    if 'export_results' in result:
+        console.print("\n[bold blue]Export Results:[/bold blue]")
+        export_results = result['export_results']
+        
+        successful_exports = [k for k in export_results.keys() if not k.endswith('_error') and k != 'report']
+        failed_exports = [k for k in export_results.keys() if k.endswith('_error')]
+        
+        if successful_exports:
+            console.print(f"[green]✓[/green] Successfully exported {len(successful_exports)} formats:")
+            for format_type in successful_exports:
+                console.print(f"  • {format_type.upper()}: {export_results[format_type]}")
+        
+        if failed_exports:
+            console.print(f"[red]✗[/red] Failed exports ({len(failed_exports)}):")
+            for format_type in failed_exports:
+                original_format = format_type.replace('_error', '')
+                console.print(f"  • {original_format.upper()}: {export_results[format_type]}")
+        
+        if 'report' in export_results:
+            console.print(f"[blue]📄[/blue] Export report: {export_results['report']}")
     
     logger.info(f"Results saved to {output_path}")
 

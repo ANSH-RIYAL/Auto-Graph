@@ -12,6 +12,7 @@ from ..parser.file_parser import FileParser
 from ..models.schemas import Graph, GraphMetadata, GraphNode, GraphEdge, NodeLevel, NodeType, EdgeType, ComplexityLevel
 from ..models.graph_models import GraphBuilder, FileCategorizer
 from ..graph_builder.enhanced_graph_builder import EnhancedGraphBuilder
+from ..export.enhanced_exporter import EnhancedExporter
 
 logger = get_logger(__name__)
 
@@ -23,6 +24,7 @@ class CodebaseAnalyzer:
         self.file_parser = FileParser()
         self.graph_builder = GraphBuilder()
         self.enhanced_graph_builder = EnhancedGraphBuilder()
+        self.enhanced_exporter = EnhancedExporter()
         self.analysis_results: Dict[str, Any] = {}
     
     def analyze_codebase(self, codebase_path: str) -> Dict[str, Any]:
@@ -50,8 +52,11 @@ class CodebaseAnalyzer:
             if validation_issues:
                 logger.log_graph_validation(validation_issues)
             
-            # Step 4: Generate final result with enhanced statistics
-            result = self._create_enhanced_analysis_result(codebase_path, parsing_result, graph, validation_issues)
+            # Step 4: Export graph in multiple formats
+            export_results = self._export_analysis_results(graph, codebase_path)
+            
+            # Step 5: Generate final result with enhanced statistics
+            result = self._create_enhanced_analysis_result(codebase_path, parsing_result, graph, validation_issues, export_results)
             
             logger.log_analysis_complete(result['statistics'])
             return result
@@ -340,8 +345,30 @@ class CodebaseAnalyzer:
                 'category': 'backend'
             }
     
-    def _create_enhanced_analysis_result(self, codebase_path: str, parsing_result: Dict[str, Any], graph: Graph, validation_issues: List[str]) -> Dict[str, Any]:
-        """Create the final enhanced analysis result with semantic analysis."""
+    def _export_analysis_results(self, graph: Graph, codebase_path: str) -> Dict[str, str]:
+        """Export analysis results in multiple formats."""
+        logger.info("Exporting analysis results...")
+        
+        # Create export directory
+        export_dir = Path("graph") / Path(codebase_path).name / "exports"
+        export_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Export in all formats
+        export_results = self.enhanced_exporter.export_graph(graph, str(export_dir))
+        
+        # Generate export report
+        report_content = self.enhanced_exporter.generate_export_report(export_results)
+        report_path = export_dir / "export_report.md"
+        with open(report_path, 'w') as f:
+            f.write(report_content)
+        
+        export_results['report'] = str(report_path)
+        logger.info(f"Export completed. Report: {report_path}")
+        
+        return export_results
+    
+    def _create_enhanced_analysis_result(self, codebase_path: str, parsing_result: Dict[str, Any], graph: Graph, validation_issues: List[str], export_results: Dict[str, str]) -> Dict[str, Any]:
+        """Create the final enhanced analysis result with semantic analysis and exports."""
         # Get enhanced statistics
         enhanced_stats = self.enhanced_graph_builder.get_enhanced_statistics()
         
@@ -351,11 +378,14 @@ class CodebaseAnalyzer:
             'graph': graph,
             'parsing_result': parsing_result,
             'validation_issues': validation_issues,
+            'export_results': export_results,
             'enhanced_features': {
                 'semantic_analysis': True,
                 'relationship_mapping': True,
                 'complexity_analysis': True,
-                'dependency_analysis': True
+                'dependency_analysis': True,
+                'visualization': True,
+                'multi_format_export': True
             },
             'statistics': {
                 'total_files': parsing_result['parsing_stats']['total_files'],
@@ -365,7 +395,8 @@ class CodebaseAnalyzer:
                 'lld_nodes': len([n for n in graph.nodes if n.level == NodeLevel.LLD]),
                 'total_edges': len(graph.edges),
                 'semantic_analysis': enhanced_stats['semantic_analysis'],
-                'relationship_mapping': enhanced_stats['relationship_mapping']
+                'relationship_mapping': enhanced_stats['relationship_mapping'],
+                'export_formats': len([k for k in export_results.keys() if not k.endswith('_error')])
             }
         }
     

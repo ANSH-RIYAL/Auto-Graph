@@ -36,6 +36,7 @@ class NodeType(str, Enum):
 class EdgeType(str, Enum):
     """Enumeration for different types of relationships between nodes."""
     DEPENDS_ON = "depends_on"
+    DEPENDS = "depends"  # Alias for DEPENDS_ON
     CONTAINS = "contains"
     CALLS = "calls"
     IMPORTS = "imports"
