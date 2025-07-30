@@ -8,6 +8,7 @@ from pathlib import Path
 from ..utils.logger import get_logger
 from ..models.schemas import NodeLevel, NodeType, ComplexityLevel
 from ..models.graph_models import SymbolInfo
+from .llm_client import LLMClient
 
 logger = get_logger(__name__)
 
@@ -18,11 +19,15 @@ class SemanticAnalyzer:
     def __init__(self):
         self.cache: Dict[str, Dict[str, Any]] = {}
         self.analysis_results: Dict[str, Dict[str, Any]] = {}
+        self.llm_client = LLMClient()
     
     def analyze_file_semantics(self, file_path: str, symbols: Dict[str, List[SymbolInfo]], 
                               file_content: str) -> Dict[str, Any]:
         """Analyze the semantic meaning of a file and its components."""
         logger.debug(f"Analyzing semantics for: {file_path}")
+        
+        # Convert symbols to serializable format for LLM
+        serializable_symbols = self._convert_symbols_to_serializable(symbols)
         
         # Check cache first
         cache_key = self._generate_cache_key(file_path, symbols)
@@ -30,20 +35,11 @@ class SemanticAnalyzer:
             logger.debug(f"Using cached analysis for: {file_path}")
             return self.cache[cache_key]
         
-        # Prepare analysis data
-        analysis_data = {
-            'file_path': file_path,
-            'file_name': Path(file_path).name,
-            'functions': [s.name for s in symbols.get('functions', [])],
-            'classes': [s.name for s in symbols.get('classes', [])],
-            'imports': [s.name for s in symbols.get('imports', [])],
-            'file_content_preview': self._get_content_preview(file_content),
-            'file_size': len(file_content),
-            'line_count': len(file_content.split('\n'))
-        }
+        # Use LLM client for analysis
+        llm_result = self.llm_client.analyze_component(file_path, file_content, serializable_symbols)
         
-        # Generate semantic analysis (without LLM calls for now)
-        semantic_analysis = self._generate_semantic_analysis(analysis_data)
+        # Convert LLM result to our format
+        semantic_analysis = self._convert_llm_result(llm_result, file_path, symbols)
         
         # Cache the result and store in analysis results
         self.cache[cache_key] = semantic_analysis
@@ -232,6 +228,63 @@ class SemanticAnalyzer:
         
         return relationships
     
+    def _convert_llm_result(self, llm_result: Dict[str, Any], file_path: str, symbols: Dict[str, List[SymbolInfo]]) -> Dict[str, Any]:
+        """Convert LLM result to our semantic analysis format."""
+        # Convert component type to NodeType enum
+        component_type = self._map_component_type(llm_result.get('component_type', 'Function'))
+        
+        # Convert level to NodeLevel enum
+        level = NodeLevel.HLD if llm_result.get('level') == 'HLD' else NodeLevel.LLD
+        
+        # Convert complexity to ComplexityLevel enum
+        complexity = self._map_complexity(llm_result.get('complexity', 'low'))
+        
+        return {
+            'purpose': llm_result.get('purpose', 'Code component'),
+            'level': level,
+            'component_type': component_type,
+            'complexity': complexity,
+            'relationships': llm_result.get('relationships', []),
+            'confidence': llm_result.get('confidence', 0.5),
+            'analysis_method': llm_result.get('analysis_method', 'llm')
+        }
+    
+    def _map_component_type(self, component_type: str) -> NodeType:
+        """Map component type string to NodeType enum."""
+        type_mapping = {
+            'Module': NodeType.MODULE,
+            'API': NodeType.API,
+            'Service': NodeType.SERVICE,
+            'Function': NodeType.FUNCTION,
+            'Class': NodeType.CLASS,
+            'Utility': NodeType.UTILITY,
+            'Controller': NodeType.CONTROLLER,
+            'Model': NodeType.MODEL,
+            'Database': NodeType.DATABASE,
+            'Client': NodeType.CLIENT,
+            'Component': NodeType.COMPONENT
+        }
+        return type_mapping.get(component_type, NodeType.FUNCTION)
+    
+    def _map_complexity(self, complexity: str) -> ComplexityLevel:
+        """Map complexity string to ComplexityLevel enum."""
+        complexity_mapping = {
+            'low': ComplexityLevel.LOW,
+            'medium': ComplexityLevel.MEDIUM,
+            'high': ComplexityLevel.HIGH
+        }
+        return complexity_mapping.get(complexity.lower(), ComplexityLevel.LOW)
+    
+    def _convert_symbols_to_serializable(self, symbols: Dict[str, List[SymbolInfo]]) -> Dict[str, Any]:
+        """Convert SymbolInfo objects to serializable format."""
+        serializable = {}
+        for key, value in symbols.items():
+            if isinstance(value, list):
+                serializable[key] = [item.name if hasattr(item, 'name') else str(item) for item in value]
+            else:
+                serializable[key] = str(value)
+        return serializable
+    
     def _get_content_preview(self, content: str, max_lines: int = 10) -> str:
         """Get a preview of file content for analysis."""
         lines = content.split('\n')
@@ -275,9 +328,19 @@ Content Preview:
     
     def get_analysis_statistics(self) -> Dict[str, Any]:
         """Get statistics about the semantic analysis."""
+        total_files = len(self.analysis_results)
+        cached_results = len(self.cache)
+        
+        # Count analysis methods
+        llm_analyses = sum(1 for result in self.analysis_results.values() 
+                          if result.get('analysis_method') == 'llm')
+        fallback_analyses = total_files - llm_analyses
+        
         return {
-            'total_files_analyzed': len(self.analysis_results),
-            'cached_results': len(self.cache),
-            'analysis_method': 'rule_based',
-            'llm_integration_ready': True
+            'total_files_analyzed': total_files,
+            'cached_results': cached_results,
+            'analysis_method': 'llm' if llm_analyses > 0 else 'rule_based',
+            'llm_integration_ready': True,
+            'llm_analyses': llm_analyses,
+            'fallback_analyses': fallback_analyses
         } 

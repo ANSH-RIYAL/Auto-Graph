@@ -76,12 +76,21 @@ class FileParser:
             success = self.python_parser.parse_file(file_path)
             
             if success:
+                # Read file content for LLM analysis
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                except Exception as e:
+                    logger.warning(f"Could not read file content for {file_path}: {e}")
+                    file_content = ""
+                
                 # Collect parsing results
                 symbols = self.python_parser.get_symbols()
                 
                 self.parsed_files[str(file_path)] = {
                     'file_info': file_info,
                     'symbols': symbols,
+                    'file_content': file_content,
                     'imports': self.python_parser.get_imports(),
                     'functions': [f.name for f in self.python_parser.get_functions()],
                     'classes': [c.name for c in self.python_parser.get_classes()],
@@ -99,6 +108,14 @@ class FileParser:
     def _parse_generic_file(self, file_path: Path, file_info: FileInfo) -> bool:
         """Parse a non-Python file (basic info only)."""
         try:
+            # Read file content for LLM analysis
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+            except Exception as e:
+                logger.warning(f"Could not read file content for {file_path}: {e}")
+                file_content = ""
+            
             # For non-Python files, we just collect basic metadata
             self.parsed_files[str(file_path)] = {
                 'file_info': file_info,
@@ -108,6 +125,7 @@ class FileParser:
                     'classes': [],
                     'variables': []
                 },
+                'file_content': file_content,
                 'imports': [],
                 'functions': [],
                 'classes': [],

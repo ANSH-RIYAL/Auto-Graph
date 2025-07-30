@@ -51,10 +51,8 @@ class EnhancedGraphBuilder:
         
         for file_path, file_data in parsing_result['parsed_files'].items():
             try:
-                # Get file content for analysis
-                file_content = FileUtils.get_file_content(Path(file_path))
-                if file_content is None:
-                    continue
+                # Get file content from parsing result
+                file_content = file_data.get('file_content', '')
                 
                 # Get symbols for analysis
                 symbols = file_data.get('symbols', {})
