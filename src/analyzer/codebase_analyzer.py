@@ -11,6 +11,7 @@ from ..utils.file_utils import FileUtils
 from ..parser.file_parser import FileParser
 from ..models.schemas import Graph, GraphMetadata, GraphNode, GraphEdge, NodeLevel, NodeType, EdgeType, ComplexityLevel
 from ..models.graph_models import GraphBuilder, FileCategorizer
+from ..graph_builder.enhanced_graph_builder import EnhancedGraphBuilder
 
 logger = get_logger(__name__)
 
@@ -21,6 +22,7 @@ class CodebaseAnalyzer:
     def __init__(self):
         self.file_parser = FileParser()
         self.graph_builder = GraphBuilder()
+        self.enhanced_graph_builder = EnhancedGraphBuilder()
         self.analysis_results: Dict[str, Any] = {}
     
     def analyze_codebase(self, codebase_path: str) -> Dict[str, Any]:
@@ -40,16 +42,16 @@ class CodebaseAnalyzer:
             if not parsing_result['success']:
                 return self._create_error_result("File parsing failed")
             
-            # Step 2: Build initial graph structure
-            graph = self._build_graph_structure(codebase_path, parsing_result)
+            # Step 2: Build enhanced graph structure with semantic analysis
+            graph = self.enhanced_graph_builder.build_enhanced_graph(codebase_path, parsing_result)
             
             # Step 3: Validate graph
             validation_issues = self.graph_builder.validate_graph()
             if validation_issues:
                 logger.log_graph_validation(validation_issues)
             
-            # Step 4: Generate final result
-            result = self._create_analysis_result(codebase_path, parsing_result, graph, validation_issues)
+            # Step 4: Generate final result with enhanced statistics
+            result = self._create_enhanced_analysis_result(codebase_path, parsing_result, graph, validation_issues)
             
             logger.log_analysis_complete(result['statistics'])
             return result
@@ -338,23 +340,38 @@ class CodebaseAnalyzer:
                 'category': 'backend'
             }
     
-    def _create_analysis_result(self, codebase_path: str, parsing_result: Dict[str, Any], graph: Graph, validation_issues: List[str]) -> Dict[str, Any]:
-        """Create the final analysis result."""
+    def _create_enhanced_analysis_result(self, codebase_path: str, parsing_result: Dict[str, Any], graph: Graph, validation_issues: List[str]) -> Dict[str, Any]:
+        """Create the final enhanced analysis result with semantic analysis."""
+        # Get enhanced statistics
+        enhanced_stats = self.enhanced_graph_builder.get_enhanced_statistics()
+        
         return {
             'success': True,
             'codebase_path': codebase_path,
             'graph': graph,
             'parsing_result': parsing_result,
             'validation_issues': validation_issues,
+            'enhanced_features': {
+                'semantic_analysis': True,
+                'relationship_mapping': True,
+                'complexity_analysis': True,
+                'dependency_analysis': True
+            },
             'statistics': {
                 'total_files': parsing_result['parsing_stats']['total_files'],
                 'successful_parses': parsing_result['parsing_stats']['successful_parses'],
                 'coverage_percentage': parsing_result['parsing_stats']['coverage_percentage'],
                 'hld_nodes': len([n for n in graph.nodes if n.level == NodeLevel.HLD]),
                 'lld_nodes': len([n for n in graph.nodes if n.level == NodeLevel.LLD]),
-                'total_edges': len(graph.edges)
+                'total_edges': len(graph.edges),
+                'semantic_analysis': enhanced_stats['semantic_analysis'],
+                'relationship_mapping': enhanced_stats['relationship_mapping']
             }
         }
+    
+    def _create_analysis_result(self, codebase_path: str, parsing_result: Dict[str, Any], graph: Graph, validation_issues: List[str]) -> Dict[str, Any]:
+        """Create the final analysis result (legacy method)."""
+        return self._create_enhanced_analysis_result(codebase_path, parsing_result, graph, validation_issues)
     
     def _create_error_result(self, error_message: str) -> Dict[str, Any]:
         """Create error result when analysis fails."""
