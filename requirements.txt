@@ -15,4 +15,7 @@ flake8>=6.0.0
 # Utilities
 click>=8.0.0
 rich>=13.0.0
-pathlib2>=2.3.0 
+pathlib2>=2.3.0
+
+# Web Framework
+Flask>=2.3.0 

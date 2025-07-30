@@ -6,4 +6,7 @@ OPENAI_MODEL=gpt-4o-mini
 LLM_ENABLED=true
 LLM_CACHE_ENABLED=true
 LLM_MAX_TOKENS=2000
-LLM_TEMPERATURE=0.1 
+LLM_TEMPERATURE=0.1
+
+# Quick disable for testing (set to 'true' to disable LLM calls completely)
+LLM_DISABLE_FOR_TESTING=false 

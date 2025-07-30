@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoGraph - Codebase Graph Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo">
+                        <i class="fas fa-network-wired"></i>
+                    </div>
+                    <div class="title">
+                        <h1>AutoGraph</h1>
+                        <span>Codebase Graph Generator</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="view-toggle">
+                        <button class="view-btn active" data-view="HLD">HLD</button>
+                        <button class="view-btn" data-view="LLD">LLD</button>
+                    </div>
+                    <button class="help-btn">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- File Input Section -->
+                <div class="sidebar-section">
+                    <h2>Input Source</h2>
+                    <div class="input-tabs">
+                        <button class="tab-btn active" data-tab="upload">
+                            <i class="fas fa-upload"></i>
+                            Upload
+                        </button>
+                        <button class="tab-btn" data-tab="github">
+                            <i class="fab fa-github"></i>
+                            GitHub
+                        </button>
+                    </div>
+
+                    <!-- Upload Tab -->
+                    <div class="tab-content active" id="upload-tab">
+                        <div class="file-drop-zone" id="fileDropZone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Drop files here or click to browse</p>
+                            <span>Supports .zip, .tar.gz, or individual files</span>
+                            <input type="file" id="fileInput" multiple accept=".zip,.tar,.gz,.js,.ts,.py,.java,.cpp,.c,.h" style="display: none;">
+                        </div>
+                    </div>
+
+                    <!-- GitHub Tab -->
+                    <div class="tab-content" id="github-tab">
+                        <div class="form-group">
+                            <label for="githubUrl">Repository URL</label>
+                            <input type="url" id="githubUrl" placeholder="https://github.com/username/repository">
+                        </div>
+                        <div class="form-group">
+                            <label for="githubBranch">Branch (optional)</label>
+                            <input type="text" id="githubBranch" placeholder="main" value="main">
+                        </div>
+                    </div>
+
+                    <button class="analyze-btn" id="analyzeBtn">
+                        <i class="fas fa-play"></i>
+                        Start Analysis
+                    </button>
+                </div>
+
+                <!-- Status Panel -->
+                <div class="sidebar-section" id="statusSection" style="display: none;">
+                    <h2>Analysis Status</h2>
+                    <div class="status-content">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p id="statusMessage">Processing...</p>
+                    </div>
+                </div>
+
+                <!-- Export Panel -->
+                <div class="sidebar-section" id="exportSection" style="display: none;">
+                    <h2>Export Formats</h2>
+                    <div class="export-grid">
+                        <button class="export-btn" data-format="json">JSON</button>
+                        <button class="export-btn" data-format="yaml">YAML</button>
+                        <button class="export-btn" data-format="csv">CSV</button>
+                        <button class="export-btn" data-format="dot">DOT</button>
+                        <button class="export-btn" data-format="html">HTML</button>
+                        <button class="export-btn" data-format="mermaid">Mermaid</button>
+                    </div>
+                </div>
+
+                <!-- Metadata Panel -->
+                <div class="sidebar-section" id="metadataSection" style="display: none;">
+                    <h2>Codebase Metadata</h2>
+                    <div class="metadata-content" id="metadataContent">
+                        <!-- Metadata will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Logs Panel -->
+                <div class="sidebar-section">
+                    <h2>Analysis Logs</h2>
+                    <div class="logs-content" id="logsContent">
+                        <div class="log-entry">
+                            <span class="log-time">Ready to analyze</span>
+                            <span class="log-message">Upload a file or provide a GitHub URL to start</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Graph Area -->
+            <div class="graph-area">
+                <div class="graph-toolbar">
+                    <div class="toolbar-left">
+                        <h2 id="graphTitle">High-Level Design Graph</h2>
+                        <div class="graph-stats">
+                            <span id="nodeCount">0 nodes</span>
+                            <span>•</span>
+                            <span id="edgeCount">0 connections</span>
+                        </div>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="toolbar-btn" id="zoomOutBtn">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                        <button class="toolbar-btn" id="zoomInBtn">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button class="toolbar-btn" id="fitViewBtn">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                        <button class="toolbar-btn" id="exportBtn">
+                            <i class="fas fa-download"></i>
+                            Export
+                        </button>
+                    </div>
+                </div>
+
+                <div class="graph-container" id="graphContainer">
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-icon">
+                            <i class="fas fa-project-diagram"></i>
+                        </div>
+                        <h3>No Graph Data</h3>
+                        <p>Upload a codebase or provide a GitHub URL to generate the graph visualization</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Node Details Panel -->
+            <div class="node-details" id="nodeDetails" style="display: none;">
+                <div class="node-details-header">
+                    <h3 id="nodeDetailsTitle">Node Details</h3>
+                    <button class="close-btn" id="closeNodeDetails">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="node-details-content" id="nodeDetailsContent">
+                    <!-- Node details will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html> 

@@ -26,10 +26,13 @@ class Settings:
     LLM_MAX_TOKENS: int = int(os.getenv('LLM_MAX_TOKENS', '2000'))
     LLM_TEMPERATURE: float = float(os.getenv('LLM_TEMPERATURE', '0.1'))
     
+    # Quick disable for testing (set to 'false' to disable LLM calls completely)
+    LLM_DISABLE_FOR_TESTING: bool = os.getenv('LLM_DISABLE_FOR_TESTING', 'false').lower() == 'true'
+    
     @classmethod
     def validate_llm_config(cls) -> bool:
         """Validate that LLM configuration is complete."""
-        if not cls.LLM_ENABLED:
+        if not cls.LLM_ENABLED or cls.LLM_DISABLE_FOR_TESTING:
             return False
         if not cls.OPENAI_API_KEY:
             return False
@@ -43,8 +46,9 @@ class Settings:
             'model': cls.OPENAI_MODEL,
             'max_tokens': cls.LLM_MAX_TOKENS,
             'temperature': cls.LLM_TEMPERATURE,
-            'enabled': cls.LLM_ENABLED,
-            'cache_enabled': cls.LLM_CACHE_ENABLED
+            'enabled': cls.LLM_ENABLED and not cls.LLM_DISABLE_FOR_TESTING,
+            'cache_enabled': cls.LLM_CACHE_ENABLED,
+            'disabled_for_testing': cls.LLM_DISABLE_FOR_TESTING
         }
 
 
