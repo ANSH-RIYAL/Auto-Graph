@@ -55,6 +55,7 @@ const elements = {
     closeNodeDetails: document.getElementById('closeNodeDetails'),
     
     // Toolbar buttons
+    enhancedViewBtn: document.getElementById('enhancedViewBtn'),
     zoomOutBtn: document.getElementById('zoomOutBtn'),
     zoomInBtn: document.getElementById('zoomInBtn'),
     fitViewBtn: document.getElementById('fitViewBtn'),
@@ -98,6 +99,7 @@ function initializeEventListeners() {
     elements.closeNodeDetails.addEventListener('click', closeNodeDetails);
     
     // Toolbar buttons
+    elements.enhancedViewBtn.addEventListener('click', openEnhancedView);
     elements.zoomOutBtn.addEventListener('click', () => zoomGraph(-0.1));
     elements.zoomInBtn.addEventListener('click', () => zoomGraph(0.1));
     elements.fitViewBtn.addEventListener('click', fitView);
@@ -618,4 +620,16 @@ function zoomGraph(delta) {
 function fitView() {
     // In a real implementation, this would fit the graph to view
     console.log('Fit view');
+}
+
+// Enhanced view functionality
+function openEnhancedView() {
+    if (!currentAnalysisId) {
+        alert('Please run an analysis first to view the enhanced visualization');
+        return;
+    }
+    
+    // Open the enhanced view in a new tab/window
+    const enhancedViewUrl = `/graph-view?analysis_id=${currentAnalysisId}`;
+    window.open(enhancedViewUrl, '_blank');
 } 

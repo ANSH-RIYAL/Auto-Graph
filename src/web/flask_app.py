@@ -107,6 +107,11 @@ def convert_analysis_result_to_frontend_format(analysis_result):
 def index():
     return render_template('index.html')
 
+@app.route('/graph-view')
+def graph_view():
+    """Render the enhanced graph visualization view"""
+    return render_template('graph_view.html')
+
 @app.route('/api/analysis/upload', methods=['POST'])
 def upload_analysis():
     """Handle file upload for analysis"""

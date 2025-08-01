@@ -1,0 +1,1360 @@
+{
+  "metadata": {
+    "codebase_path": "examples/sample_codebases/calculator_app",
+    "analysis_timestamp": "2025-08-01 05:55:41.620791",
+    "file_count": 13,
+    "coverage_percentage": 100.0,
+    "total_lines": 788,
+    "languages": [
+      "text",
+      "markdown",
+      "python"
+    ],
+    "categories": {
+      "other": 2,
+      "backend": 11
+    },
+    "statistics": {
+      "total_nodes": 15,
+      "hld_nodes": 4,
+      "lld_nodes": 11,
+      "total_edges": 73,
+      "technical_depths": {
+        "business": 4,
+        "system": 0,
+        "implementation": 11
+      }
+    },
+    "pm_metrics": {
+      "development_velocity": "medium",
+      "risk_level": "low",
+      "completion_percentage": 82.0,
+      "blocked_components": 0,
+      "active_dependencies": 73
+    }
+  },
+  "nodes": [
+    {
+      "id": "module_service_layer",
+      "name": "Service Layer",
+      "type": "Service",
+      "level": "HLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/services/history_service.py",
+        "examples/sample_codebases/calculator_app/calculator/services/__init__.py",
+        "examples/sample_codebases/calculator_app/calculator/services/calculator_service.py"
+      ],
+      "line_numbers": {},
+      "parent": null,
+      "children": [
+        "class_HistoryService_history_service",
+        "function_group_Other_history_service",
+        "class_CalculatorService_calculator_service",
+        "function_group_Business Logic_calculator_service",
+        "function_group_Other_calculator_service"
+      ],
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of 3 files with Service functionality",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 304,
+        "file_size": 10721,
+        "last_modified": null,
+        "language": "python",
+        "category": "backend",
+        "technical_depth": 1,
+        "color": "#D0021B",
+        "size": 30,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "module_data_models",
+      "name": "Data Models",
+      "type": "Model",
+      "level": "HLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/models/calculation.py",
+        "examples/sample_codebases/calculator_app/calculator/models/__init__.py"
+      ],
+      "line_numbers": {},
+      "parent": null,
+      "children": [
+        "class_Calculation_calculation",
+        "function_group_Other_calculation"
+      ],
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of 2 files with Model functionality",
+        "complexity": "low",
+        "dependencies": [],
+        "line_count": 69,
+        "file_size": 2431,
+        "last_modified": null,
+        "language": "python",
+        "category": "backend",
+        "technical_depth": 1,
+        "color": "#FFC107",
+        "size": 20,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "module_utilities",
+      "name": "Utilities",
+      "type": "Utility",
+      "level": "HLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/utils/formatters.py",
+        "examples/sample_codebases/calculator_app/calculator/utils/validators.py",
+        "examples/sample_codebases/calculator_app/calculator/utils/__init__.py",
+        "examples/sample_codebases/calculator_app/calculator/utils/exceptions.py"
+      ],
+      "line_numbers": {},
+      "parent": null,
+      "children": [
+        "function_group_Data Processing_formatters"
+      ],
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of 4 files with Utility functionality",
+        "complexity": "low",
+        "dependencies": [],
+        "line_count": 200,
+        "file_size": 6305,
+        "last_modified": null,
+        "language": "python",
+        "category": "backend",
+        "technical_depth": 1,
+        "color": "#00BCD4",
+        "size": 40,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "module_other",
+      "name": "Other",
+      "type": "Function",
+      "level": "HLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/requirements.txt",
+        "examples/sample_codebases/calculator_app/README.md",
+        "examples/sample_codebases/calculator_app/app.py",
+        "examples/sample_codebases/calculator_app/calculator/__init__.py"
+      ],
+      "line_numbers": {},
+      "parent": null,
+      "children": [
+        "function_group_Validation_app",
+        "function_group_Business Logic_app",
+        "function_group_Other_app"
+      ],
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of 4 files with Function functionality",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 215,
+        "file_size": 6245,
+        "last_modified": null,
+        "language": "python",
+        "category": "backend",
+        "technical_depth": 1,
+        "color": "#607D8B",
+        "size": 40,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "function_group_Validation_app",
+      "name": "Validation Functions",
+      "type": "Function_Group",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/app.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_other",
+      "children": [],
+      "functions": [
+        "health_check"
+      ],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of validation functions",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 10,
+        "file_size": 0,
+        "last_modified": null,
+        "language": "python",
+        "category": "function_group",
+        "technical_depth": 3,
+        "color": null,
+        "size": null,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "function_group_Business Logic_app",
+      "name": "Business Logic Functions",
+      "type": "Function_Group",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/app.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_other",
+      "children": [],
+      "functions": [
+        "calculate"
+      ],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of business logic functions",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 10,
+        "file_size": 0,
+        "last_modified": null,
+        "language": "python",
+        "category": "function_group",
+        "technical_depth": 3,
+        "color": null,
+        "size": null,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "function_group_Other_app",
+      "name": "Other Functions",
+      "type": "Function_Group",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/app.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_other",
+      "children": [],
+      "functions": [
+        "index"
+      ],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of other functions",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 10,
+        "file_size": 0,
+        "last_modified": null,
+        "language": "python",
+        "category": "function_group",
+        "technical_depth": 3,
+        "color": null,
+        "size": null,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "function_group_Data Processing_formatters",
+      "name": "Data Processing Functions",
+      "type": "Function_Group",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/utils/formatters.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_utilities",
+      "children": [],
+      "functions": [
+        "format_result",
+        "format_calculation_display",
+        "format_error_message",
+        "format_history_entry",
+        "format_statistics"
+      ],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of data processing functions",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 50,
+        "file_size": 0,
+        "last_modified": null,
+        "language": "python",
+        "category": "function_group",
+        "technical_depth": 3,
+        "color": null,
+        "size": null,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "class_Calculation_calculation",
+      "name": "Calculation Class",
+      "type": "Class",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/models/calculation.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_data_models",
+      "children": [],
+      "functions": [
+        "to_dict",
+        "from_dict"
+      ],
+      "classes": [
+        "Calculation"
+      ],
+      "imports": [],
+      "metadata": {
+        "purpose": "Class: Calculation",
+        "complexity": "low",
+        "dependencies": [],
+        "line_count": 66,
+        "file_size": 2384,
+        "last_modified": null,
+        "language": "python",
+        "category": "backend",
+        "technical_depth": 3,
+        "color": "#795548",
+        "size": 8,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "function_group_Other_calculation",
+      "name": "Other Functions",
+      "type": "Function_Group",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/models/calculation.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_data_models",
+      "children": [],
+      "functions": [
+        "to_dict",
+        "from_dict"
+      ],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of other functions",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 20,
+        "file_size": 0,
+        "last_modified": null,
+        "language": "python",
+        "category": "function_group",
+        "technical_depth": 3,
+        "color": null,
+        "size": null,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "class_HistoryService_history_service",
+      "name": "HistoryService Class",
+      "type": "Class",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/services/history_service.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_service_layer",
+      "children": [],
+      "functions": [
+        "delete_calculation",
+        "export_history",
+        "_export_as_json"
+      ],
+      "classes": [
+        "HistoryService"
+      ],
+      "imports": [],
+      "metadata": {
+        "purpose": "Class: HistoryService",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 163,
+        "file_size": 5565,
+        "last_modified": null,
+        "language": "python",
+        "category": "backend",
+        "technical_depth": 3,
+        "color": "#795548",
+        "size": 8,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "function_group_Other_history_service",
+      "name": "Other Functions",
+      "type": "Function_Group",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/services/history_service.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_service_layer",
+      "children": [],
+      "functions": [
+        "delete_calculation",
+        "export_history",
+        "_export_as_json"
+      ],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of other functions",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 30,
+        "file_size": 0,
+        "last_modified": null,
+        "language": "python",
+        "category": "function_group",
+        "technical_depth": 3,
+        "color": null,
+        "size": null,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "class_CalculatorService_calculator_service",
+      "name": "CalculatorService Class",
+      "type": "Class",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/services/calculator_service.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_service_layer",
+      "children": [],
+      "functions": [
+        "calculate",
+        "_add",
+        "_subtract",
+        "_multiply",
+        "_divide",
+        "_power",
+        "_sqrt",
+        "_log",
+        "_sin",
+        "_cos",
+        "_tan"
+      ],
+      "classes": [
+        "CalculatorService"
+      ],
+      "imports": [],
+      "metadata": {
+        "purpose": "Class: CalculatorService",
+        "complexity": "medium",
+        "dependencies": [
+          "math",
+          "typing.List",
+          "typing.Union",
+          "typing.Optional",
+          "utils.exceptions.CalculationError"
+        ],
+        "line_count": 138,
+        "file_size": 5107,
+        "last_modified": null,
+        "language": "python",
+        "category": "backend",
+        "technical_depth": 3,
+        "color": "#795548",
+        "size": 8,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "function_group_Business Logic_calculator_service",
+      "name": "Business Logic Functions",
+      "type": "Function_Group",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/services/calculator_service.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_service_layer",
+      "children": [],
+      "functions": [
+        "calculate"
+      ],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of business logic functions",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 10,
+        "file_size": 0,
+        "last_modified": null,
+        "language": "python",
+        "category": "function_group",
+        "technical_depth": 3,
+        "color": null,
+        "size": null,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    },
+    {
+      "id": "function_group_Other_calculator_service",
+      "name": "Other Functions",
+      "type": "Function_Group",
+      "level": "LLD",
+      "files": [
+        "examples/sample_codebases/calculator_app/calculator/services/calculator_service.py"
+      ],
+      "line_numbers": {},
+      "parent": "module_service_layer",
+      "children": [],
+      "functions": [
+        "_add",
+        "_subtract",
+        "_multiply",
+        "_divide",
+        "_power",
+        "_sqrt",
+        "_log",
+        "_sin",
+        "_cos",
+        "_tan"
+      ],
+      "classes": [],
+      "imports": [],
+      "metadata": {
+        "purpose": "Group of other functions",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 100,
+        "file_size": 0,
+        "last_modified": null,
+        "language": "python",
+        "category": "function_group",
+        "technical_depth": 3,
+        "color": null,
+        "size": null,
+        "agent_touched": false,
+        "agent_types": [],
+        "risk_level": "low",
+        "business_impact": null,
+        "agent_context": null
+      },
+      "pm_metadata": null,
+      "enhanced_metadata": null
+    }
+  ],
+  "edges": [
+    {
+      "from_node": "module_other",
+      "to_node": "function_group_Validation_app",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_other",
+      "to_node": "function_group_Business Logic_app",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_other",
+      "to_node": "function_group_Other_app",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_utilities",
+      "to_node": "function_group_Data Processing_formatters",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_data_models",
+      "to_node": "class_Calculation_calculation",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_data_models",
+      "to_node": "function_group_Other_calculation",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_service_layer",
+      "to_node": "class_HistoryService_history_service",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_service_layer",
+      "to_node": "function_group_Other_history_service",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_service_layer",
+      "to_node": "class_CalculatorService_calculator_service",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_service_layer",
+      "to_node": "function_group_Business Logic_calculator_service",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "module_service_layer",
+      "to_node": "function_group_Other_calculator_service",
+      "type": "contains",
+      "metadata": {
+        "relationship_type": "hierarchy"
+      }
+    },
+    {
+      "from_node": "function_group_Validation_app",
+      "to_node": "class_HistoryService_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Validation_app",
+      "to_node": "function_group_Other_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_app",
+      "to_node": "class_HistoryService_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_app",
+      "to_node": "function_group_Other_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_app",
+      "to_node": "class_HistoryService_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_app",
+      "to_node": "function_group_Other_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Validation_app",
+      "to_node": "class_CalculatorService_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Validation_app",
+      "to_node": "function_group_Business Logic_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Validation_app",
+      "to_node": "function_group_Other_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_app",
+      "to_node": "class_CalculatorService_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_app",
+      "to_node": "function_group_Business Logic_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_app",
+      "to_node": "function_group_Other_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_app",
+      "to_node": "class_CalculatorService_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_app",
+      "to_node": "function_group_Business Logic_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_app",
+      "to_node": "function_group_Other_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_Calculation_calculation",
+      "to_node": "class_HistoryService_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_Calculation_calculation",
+      "to_node": "function_group_Other_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculation",
+      "to_node": "class_HistoryService_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculation",
+      "to_node": "function_group_Other_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_Calculation_calculation",
+      "to_node": "class_CalculatorService_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_Calculation_calculation",
+      "to_node": "function_group_Business Logic_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_Calculation_calculation",
+      "to_node": "function_group_Other_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculation",
+      "to_node": "class_CalculatorService_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculation",
+      "to_node": "function_group_Business Logic_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculation",
+      "to_node": "function_group_Other_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_HistoryService_history_service",
+      "to_node": "function_group_Validation_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_HistoryService_history_service",
+      "to_node": "function_group_Business Logic_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_HistoryService_history_service",
+      "to_node": "function_group_Other_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_history_service",
+      "to_node": "function_group_Validation_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_history_service",
+      "to_node": "function_group_Business Logic_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_history_service",
+      "to_node": "function_group_Other_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_HistoryService_history_service",
+      "to_node": "class_CalculatorService_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_HistoryService_history_service",
+      "to_node": "function_group_Business Logic_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_HistoryService_history_service",
+      "to_node": "function_group_Other_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_history_service",
+      "to_node": "class_CalculatorService_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_history_service",
+      "to_node": "function_group_Business Logic_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_history_service",
+      "to_node": "function_group_Other_calculator_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculator_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_HistoryService_history_service",
+      "to_node": "class_Calculation_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_HistoryService_history_service",
+      "to_node": "function_group_Other_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_history_service",
+      "to_node": "class_Calculation_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_history_service",
+      "to_node": "function_group_Other_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_CalculatorService_calculator_service",
+      "to_node": "function_group_Validation_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_CalculatorService_calculator_service",
+      "to_node": "function_group_Business Logic_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_CalculatorService_calculator_service",
+      "to_node": "function_group_Other_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_calculator_service",
+      "to_node": "function_group_Validation_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_calculator_service",
+      "to_node": "function_group_Business Logic_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_calculator_service",
+      "to_node": "function_group_Other_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculator_service",
+      "to_node": "function_group_Validation_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculator_service",
+      "to_node": "function_group_Business Logic_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculator_service",
+      "to_node": "function_group_Other_app",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in app.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_CalculatorService_calculator_service",
+      "to_node": "class_HistoryService_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_CalculatorService_calculator_service",
+      "to_node": "function_group_Other_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_calculator_service",
+      "to_node": "class_HistoryService_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_calculator_service",
+      "to_node": "function_group_Other_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculator_service",
+      "to_node": "class_HistoryService_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculator_service",
+      "to_node": "function_group_Other_history_service",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in history_service.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_CalculatorService_calculator_service",
+      "to_node": "class_Calculation_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "class_CalculatorService_calculator_service",
+      "to_node": "function_group_Other_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_calculator_service",
+      "to_node": "class_Calculation_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Business Logic_calculator_service",
+      "to_node": "function_group_Other_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculator_service",
+      "to_node": "class_Calculation_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    },
+    {
+      "from_node": "function_group_Other_calculator_service",
+      "to_node": "function_group_Other_calculation",
+      "type": "calls",
+      "metadata": {
+        "strength": "medium",
+        "description": "Calls functions in calculation.py",
+        "relationship_type": "semantic"
+      }
+    }
+  ]
+}

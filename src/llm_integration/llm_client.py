@@ -23,9 +23,16 @@ class LLMClient:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         if settings.validate_llm_config():
-            openai.api_key = settings.OPENAI_API_KEY
-            self.client = openai.OpenAI()
-            logger.info("LLM client initialized successfully")
+            try:
+                # Initialize OpenAI client with proper configuration
+                self.client = openai.OpenAI(
+                    api_key=settings.OPENAI_API_KEY,
+                    # Remove any problematic parameters that might cause issues
+                )
+                logger.info("LLM client initialized successfully")
+            except Exception as e:
+                logger.warning(f"LLM client initialization failed: {e}")
+                self.client = None
         else:
             logger.warning("LLM client not initialized - missing configuration")
     
@@ -214,19 +221,77 @@ Provide a JSON analysis of this component's role in the system architecture."""
         
         # Simple rule-based analysis
         file_name = Path(file_path).name.lower()
+        file_path_lower = str(file_path).lower()
         
-        if any(keyword in file_name for keyword in ['api', 'route', 'endpoint']):
+        # Check for HLD components
+        if any(keyword in file_name for keyword in ['api', 'route', 'endpoint', 'controller']):
             result['level'] = 'HLD'
             result['component_type'] = 'API'
             result['purpose'] = 'Handles HTTP requests and API endpoints'
-        elif any(keyword in file_name for keyword in ['service', 'business']):
+            result['complexity'] = 'medium'
+        elif any(keyword in file_name for keyword in ['service', 'business', 'manager']):
             result['level'] = 'HLD'
             result['component_type'] = 'Service'
             result['purpose'] = 'Contains business logic and service operations'
-        elif any(keyword in file_name for keyword in ['model', 'entity']):
+            result['complexity'] = 'medium'
+        elif any(keyword in file_name for keyword in ['app', 'main', 'server']):
+            result['level'] = 'HLD'
+            result['component_type'] = 'Application'
+            result['purpose'] = 'Main application entry point and configuration'
+            result['complexity'] = 'high'
+        elif any(keyword in file_path_lower for keyword in ['/api/', '/routes/', '/controllers/']):
+            result['level'] = 'HLD'
+            result['component_type'] = 'API'
+            result['purpose'] = 'API layer component'
+            result['complexity'] = 'medium'
+        elif any(keyword in file_path_lower for keyword in ['/services/', '/business/']):
+            result['level'] = 'HLD'
+            result['component_type'] = 'Service'
+            result['purpose'] = 'Business logic service'
+            result['complexity'] = 'medium'
+        # Check for LLD components
+        elif any(keyword in file_name for keyword in ['model', 'entity', 'schema']):
             result['level'] = 'LLD'
             result['component_type'] = 'Model'
             result['purpose'] = 'Defines data models and entities'
+            result['complexity'] = 'low'
+        elif any(keyword in file_name for keyword in ['util', 'helper', 'tool']):
+            result['level'] = 'LLD'
+            result['component_type'] = 'Utility'
+            result['purpose'] = 'Utility functions and helper methods'
+            result['complexity'] = 'low'
+        elif any(keyword in file_name for keyword in ['test', 'spec']):
+            result['level'] = 'LLD'
+            result['component_type'] = 'Test'
+            result['purpose'] = 'Test cases and specifications'
+            result['complexity'] = 'low'
+        elif any(keyword in file_path_lower for keyword in ['/models/', '/entities/']):
+            result['level'] = 'LLD'
+            result['component_type'] = 'Model'
+            result['purpose'] = 'Data model component'
+            result['complexity'] = 'low'
+        elif any(keyword in file_path_lower for keyword in ['/utils/', '/helpers/']):
+            result['level'] = 'LLD'
+            result['component_type'] = 'Utility'
+            result['purpose'] = 'Utility component'
+            result['complexity'] = 'low'
+        else:
+            # Default analysis based on symbols
+            if symbols.get('classes'):
+                result['level'] = 'LLD'
+                result['component_type'] = 'Class'
+                result['purpose'] = 'Class definitions and implementations'
+                result['complexity'] = 'medium'
+            elif symbols.get('functions'):
+                result['level'] = 'LLD'
+                result['component_type'] = 'Function'
+                result['purpose'] = 'Function implementations'
+                result['complexity'] = 'low'
+            else:
+                result['level'] = 'LLD'
+                result['component_type'] = 'File'
+                result['purpose'] = 'Code file with various components'
+                result['complexity'] = 'low'
         
         return result
     

@@ -14,22 +14,29 @@ from typing import Optional
 class AutoGraphLogger:
     """Custom logger for AutoGraph with structured logging capabilities."""
     
-    def __init__(self, name: str = "autograph", log_dir: str = "logs"):
+    def __init__(self, name: str = "autograph", log_dir: str = "logs", enable_logging: bool = False):
         self.name = name
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(exist_ok=True)
+        self.enable_logging = enable_logging
         
         # Create logger
         self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.DEBUG)
         
-        # Clear existing handlers
-        self.logger.handlers.clear()
-        
-        # Add handlers
-        self._setup_console_handler()
-        self._setup_file_handler()
-        self._setup_error_handler()
+        # Set level based on enable_logging flag
+        if enable_logging:
+            self.logger.setLevel(logging.DEBUG)
+            # Clear existing handlers
+            self.logger.handlers.clear()
+            # Add handlers
+            self._setup_console_handler()
+            self._setup_file_handler()
+            self._setup_error_handler()
+        else:
+            # Disable all logging
+            self.logger.setLevel(logging.CRITICAL)
+            # Add a null handler to suppress all output
+            self.logger.addHandler(logging.NullHandler())
     
     def _setup_console_handler(self):
         """Setup console handler for INFO and above."""
@@ -88,59 +95,75 @@ class AutoGraphLogger:
     
     def debug(self, message: str, **kwargs):
         """Log debug message."""
-        self.logger.debug(message, **kwargs)
+        if self.enable_logging:
+            self.logger.debug(message, **kwargs)
     
     def info(self, message: str, **kwargs):
         """Log info message."""
-        self.logger.info(message, **kwargs)
+        if self.enable_logging:
+            self.logger.info(message, **kwargs)
     
     def warning(self, message: str, **kwargs):
         """Log warning message."""
-        self.logger.warning(message, **kwargs)
+        if self.enable_logging:
+            self.logger.warning(message, **kwargs)
     
     def error(self, message: str, **kwargs):
         """Log error message."""
-        self.logger.error(message, **kwargs)
+        if self.enable_logging:
+            self.logger.error(message, **kwargs)
     
     def critical(self, message: str, **kwargs):
         """Log critical message."""
-        self.logger.critical(message, **kwargs)
+        if self.enable_logging:
+            self.logger.critical(message, **kwargs)
     
     def log_analysis_start(self, codebase_path: str):
         """Log the start of codebase analysis."""
-        self.info(f"Starting analysis of codebase: {codebase_path}")
+        if self.enable_logging:
+            self.info(f"Starting analysis of codebase: {codebase_path}")
     
     def log_analysis_complete(self, stats: dict):
         """Log the completion of codebase analysis."""
-        self.info(f"Analysis complete. Statistics: {stats}")
+        if self.enable_logging:
+            self.info(f"Analysis complete. Statistics: {stats}")
     
     def log_file_processed(self, file_path: str, success: bool, error: Optional[str] = None):
         """Log file processing result."""
-        if success:
-            self.debug(f"Successfully processed: {file_path}")
-        else:
-            self.warning(f"Failed to process: {file_path} - {error}")
+        if self.enable_logging:
+            if success:
+                self.debug(f"Successfully processed: {file_path}")
+            else:
+                self.warning(f"Failed to process: {file_path} - {error}")
     
     def log_parsing_error(self, file_path: str, error: str):
         """Log parsing errors."""
-        self.error(f"Parsing error in {file_path}: {error}")
+        if self.enable_logging:
+            self.error(f"Parsing error in {file_path}: {error}")
     
     def log_graph_validation(self, issues: list):
         """Log graph validation results."""
-        if issues:
-            self.warning(f"Graph validation found {len(issues)} issues:")
-            for issue in issues:
-                self.warning(f"  - {issue}")
-        else:
-            self.info("Graph validation passed - no issues found")
+        if self.enable_logging:
+            if issues:
+                self.warning(f"Graph validation found {len(issues)} issues:")
+                for issue in issues:
+                    self.warning(f"  - {issue}")
+            else:
+                self.info("Graph validation passed - no issues found")
 
 
-# Global logger instance
-logger = AutoGraphLogger()
+# Global logger instance - silent by default
+logger = AutoGraphLogger(enable_logging=False)
 
 
-def get_logger(name: str = None) -> AutoGraphLogger:
+def get_logger(name: str = None, enable_logging: bool = False) -> AutoGraphLogger:
     """Get a logger instance."""
     if name:
-        return AutoGraphLogger(name)
-    return logger 
+        return AutoGraphLogger(name, enable_logging=enable_logging)
+    return logger
+
+
+def enable_logging_for_debug():
+    """Enable logging for debugging purposes."""
+    global logger
+    logger = AutoGraphLogger(enable_logging=True) 

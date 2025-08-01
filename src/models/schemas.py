@@ -23,6 +23,7 @@ class NodeType(str, Enum):
     SERVICE = "Service"
     DATABASE = "Database"
     CLIENT = "Client"
+    APPLICATION = "Application"
     
     # LLD Types
     COMPONENT = "Component"
@@ -32,6 +33,7 @@ class NodeType(str, Enum):
     UTILITY = "Utility"
     CONTROLLER = "Controller"
     MODEL = "Model"
+    TEST = "Test"
 
 
 class EdgeType(str, Enum):
@@ -53,6 +55,21 @@ class ComplexityLevel(str, Enum):
     HIGH = "high"
 
 
+class TechnicalDepth(int, Enum):
+    """Enumeration for technical depth levels."""
+    BUSINESS = 1  # Business view (HLD only)
+    SYSTEM = 2    # System view (HLD + key LLD)
+    IMPLEMENTATION = 3  # Full implementation view (HLD + all LLD)
+
+
+class RiskLevel(str, Enum):
+    """Enumeration for risk levels."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
 class NodeMetadata(BaseModel):
     """Metadata associated with a graph node."""
     purpose: Optional[str] = Field(None, description="Purpose and responsibility of the node")
@@ -63,6 +80,39 @@ class NodeMetadata(BaseModel):
     last_modified: Optional[datetime] = Field(None, description="Last modification timestamp")
     language: Optional[str] = Field(None, description="Programming language")
     category: Optional[str] = Field(None, description="Category (frontend/backend/module/test/config)")
+    
+    # Enhanced metadata for visualization
+    technical_depth: TechnicalDepth = Field(TechnicalDepth.IMPLEMENTATION, description="Technical depth level")
+    color: Optional[str] = Field(None, description="Node color for visualization")
+    size: Optional[int] = Field(None, description="Node size for visualization")
+    
+    # Agent detection metadata
+    agent_touched: bool = Field(False, description="Whether this component uses AI agents")
+    agent_types: List[str] = Field(default_factory=list, description="Types of AI agents used")
+    risk_level: RiskLevel = Field(RiskLevel.LOW, description="Business risk level")
+    business_impact: Optional[str] = Field(None, description="Business impact description")
+    agent_context: Optional[str] = Field(None, description="Context of AI agent usage")
+
+
+class PMMetadata(BaseModel):
+    """Project management metadata for nodes."""
+    business_value: Optional[str] = Field(None, description="Business value of the component")
+    development_status: str = Field("Active", description="Development status")
+    completion_percentage: float = Field(0.0, description="Completion percentage (0-100)")
+    team_size: Optional[int] = Field(None, description="Team size working on this component")
+    estimated_completion: Optional[str] = Field(None, description="Estimated completion date")
+    risk_factors: List[str] = Field(default_factory=list, description="Risk factors")
+    stakeholder_priority: str = Field("medium", description="Stakeholder priority")
+
+
+class EnhancedMetadata(BaseModel):
+    """Enhanced metadata for detailed analysis."""
+    total_symbols: int = Field(0, description="Total number of symbols")
+    has_parent: bool = Field(False, description="Whether node has a parent")
+    has_children: bool = Field(False, description="Whether node has children")
+    child_count: int = Field(0, description="Number of children")
+    file_diversity: int = Field(0, description="Number of different files")
+    complexity_score: int = Field(1, description="Complexity score (1-5)")
 
 
 class GraphNode(BaseModel):
@@ -87,6 +137,8 @@ class GraphNode(BaseModel):
     
     # Metadata
     metadata: NodeMetadata = Field(default_factory=NodeMetadata, description="Node metadata")
+    pm_metadata: Optional[PMMetadata] = Field(None, description="Project management metadata")
+    enhanced_metadata: Optional[EnhancedMetadata] = Field(None, description="Enhanced analysis metadata")
 
 
 class GraphEdge(BaseModel):
@@ -95,6 +147,24 @@ class GraphEdge(BaseModel):
     to_node: str = Field(..., description="Target node ID")
     type: EdgeType = Field(..., description="Type of relationship")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Edge metadata")
+
+
+class PMMetrics(BaseModel):
+    """Project management metrics for the entire graph."""
+    development_velocity: str = Field("medium", description="Development velocity")
+    risk_level: RiskLevel = Field(RiskLevel.LOW, description="Overall risk level")
+    completion_percentage: float = Field(0.0, description="Overall completion percentage")
+    blocked_components: int = Field(0, description="Number of blocked components")
+    active_dependencies: int = Field(0, description="Number of active dependencies")
+
+
+class GraphStatistics(BaseModel):
+    """Statistics about the graph."""
+    total_nodes: int = Field(0, description="Total number of nodes")
+    hld_nodes: int = Field(0, description="Number of HLD nodes")
+    lld_nodes: int = Field(0, description="Number of LLD nodes")
+    total_edges: int = Field(0, description="Total number of edges")
+    technical_depths: Dict[str, int] = Field(default_factory=dict, description="Nodes by technical depth")
 
 
 class GraphMetadata(BaseModel):
@@ -106,6 +176,10 @@ class GraphMetadata(BaseModel):
     total_lines: int = Field(0, description="Total lines of code")
     languages: List[str] = Field(default_factory=list, description="Programming languages found")
     categories: Dict[str, int] = Field(default_factory=dict, description="File categories and counts")
+    
+    # Enhanced metadata
+    statistics: GraphStatistics = Field(default_factory=GraphStatistics, description="Graph statistics")
+    pm_metrics: Optional[PMMetrics] = Field(None, description="Project management metrics")
 
 
 class Graph(BaseModel):

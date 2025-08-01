@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoGraph - Enhanced Graph Visualization</title>
+    <script src="https://unpkg.com/cytoscape@3.21.1/dist/cytoscape.min.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        #cy { 
+            width: 100vw; 
+            height: 100vh; 
+            background: #ffffff;
+        }
+        
+        .controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            min-width: 320px;
+        }
+        
+        .depth-controls {
+            margin-bottom: 20px;
+        }
+        
+        .depth-controls > div:first-child {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .depth-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .depth-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .depth-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .view-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .mode-btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            border: 2px solid transparent;
+        }
+        
+        .mode-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .mode-btn:hover {
+            background: #e9ecef;
+            border-color: #dee2e6;
+        }
+        
+        .mode-btn.active:hover {
+            background: #0056b3;
+        }
+        
+        .pm-info {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 12px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .pm-info h4 {
+            margin: 0 0 8px 0;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .pm-info div {
+            margin: 4px 0;
+            color: #666;
+        }
+        
+        button {
+            margin: 3px;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        button:hover {
+            background: #e9ecef;
+        }
+
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        .back-btn:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button class="back-btn" onclick="goBack()">
+            <i class="fas fa-arrow-left"></i> Back to Main View
+        </button>
+        
+        <div class="depth-controls">
+            <div>Technical Depth:</div>
+            <div class="slider-container">
+                <input type="range" id="depthSlider" min="1" max="3" value="1" class="depth-slider">
+                <div class="slider-labels">
+                    <span>Business</span>
+                    <span>System</span>
+                    <span>Implementation</span>
+                </div>
+            </div>
+        </div>
+        <div class="view-controls">
+            <button class="mode-btn active" onclick="setViewMode('HIERARCHY')" id="hierarchyBtn">Hierarchy View</button>
+            <button class="mode-btn" onclick="setViewMode('CONNECTIONS')" id="connectionsBtn">All Connections</button>
+        </div>
+        <button onclick="cy.fit()">Fit All</button>
+        <button onclick="cy.center()">Center</button>
+        
+        <div class="pm-info" id="pmInfo" style="display: none;">
+            <h4>Project Dashboard</h4>
+            <div id="pmStats"></div>
+        </div>
+    </div>
+    <div id="cy"></div>
+
+    <script>
+        let currentDepth = 1;
+        let currentViewMode = 'HIERARCHY';
+        let allData = null;
+        let analysisId = null;
+        
+        // Color mapping for HLD modules
+        const moduleColors = {
+            'module_service_layer': '#9013FE',
+            'module_utilities': '#D0021B', 
+            'module_other': '#4A90E2',
+            'frontend_module': '#4CAF50',
+            'backend_module': '#2196F3',
+            'database_module': '#FF9800'
+        };
+        
+        const cy = cytoscape({
+            container: document.getElementById('cy'),
+            elements: [],
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'content': 'data(label)',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'background-color': 'data(color)',
+                        'color': '#000000',
+                        'border-width': 2,
+                        'border-color': '#333333',
+                        'shape': 'roundrectangle',
+                        'width': 120,
+                        'height': 60,
+                        'font-size': '11px',
+                        'text-wrap': 'wrap',
+                        'text-max-width': '100px'
+                    }
+                },
+                {
+                    selector: 'node[level = "HLD"]',
+                    style: {
+                        'border-width': 4,
+                        'border-color': '#000000',
+                        'width': 150,
+                        'height': 80,
+                        'font-size': '13px',
+                        'font-weight': 'bold'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 3,
+                        'line-color': '#666666',
+                        'target-arrow-color': '#666666',
+                        'target-arrow-shape': 'triangle',
+                        'source-arrow-color': 'data(sourceArrowColor)',
+                        'source-arrow-shape': 'data(sourceArrowShape)',
+                        'curve-style': 'bezier',
+                        'content': 'data(label)',
+                        'font-size': '10px',
+                        'text-rotation': 'autorotate',
+                        'text-margin-y': -12,
+                        'text-background-color': 'white',
+                        'text-background-opacity': 0.8,
+                        'text-background-padding': 2
+                    }
+                },
+                {
+                    selector: 'edge[bidirectional = "true"]',
+                    style: {
+                        'source-arrow-shape': 'triangle',
+                        'source-arrow-color': '#666666'
+                    }
+                }
+            ],
+            layout: { name: 'preset' }
+        });
+
+        // Get analysis ID from URL
+        function getAnalysisId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('analysis_id');
+        }
+
+        // Load graph data from our API
+        async function loadGraphData() {
+            analysisId = getAnalysisId();
+            if (!analysisId) {
+                console.error('No analysis ID provided');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/analysis/${analysisId}/graph`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                // Convert our format to GraphView format
+                allData = convertToGraphViewFormat(data);
+                displayGraph();
+                
+            } catch (error) {
+                console.error('Error loading graph:', error);
+                alert('Error loading graph: ' + error.message);
+            }
+        }
+
+        // Convert our AutoGraph format to GraphView format
+        function convertToGraphViewFormat(data) {
+            if (!data || !data.nodes) {
+                console.error('Invalid data format');
+                return null;
+            }
+
+            // Add technical_depth to nodes
+            const nodes = data.nodes.map(node => ({
+                ...node,
+                technical_depth: node.level === 'HLD' ? 1 : 3,
+                color: getNodeColor(node)
+            }));
+
+            // Add bidirectional flag to edges
+            const edges = data.edges.map(edge => ({
+                ...edge,
+                from: edge.source,
+                to: edge.target,
+                bidirectional: false
+            }));
+
+            // Add PM metrics if not present
+            const metadata = data.metadata || {};
+            if (!metadata.pm_metrics) {
+                metadata.pm_metrics = {
+                    development_velocity: 'medium',
+                    risk_level: 'low',
+                    completion_percentage: 100,
+                    blocked_components: 0,
+                    active_dependencies: edges.length
+                };
+            }
+
+            return {
+                metadata: {
+                    ...metadata,
+                    pm_metrics: metadata.pm_metrics,
+                    statistics: {
+                        total_nodes: nodes.length,
+                        hld_nodes: nodes.filter(n => n.level === 'HLD').length,
+                        lld_nodes: nodes.filter(n => n.level === 'LLD').length,
+                        total_edges: edges.length
+                    }
+                },
+                nodes: nodes,
+                edges: edges
+            };
+        }
+
+        function getNodeColor(node) {
+            // Map node types to colors
+            const colorMap = {
+                'Service': '#9013FE',
+                'Utility': '#D0021B',
+                'Module': '#4A90E2',
+                'Component': '#4CAF50',
+                'Class': '#F5A623',
+                'Function': '#9C27B0'
+            };
+            
+            return colorMap[node.type] || '#f0f0f0';
+        }
+
+        function setViewMode(mode) {
+            currentViewMode = mode;
+            document.getElementById('hierarchyBtn').classList.toggle('active', mode === 'HIERARCHY');
+            document.getElementById('connectionsBtn').classList.toggle('active', mode === 'CONNECTIONS');
+            
+            if (allData) {
+                displayGraph();
+            }
+        }
+        
+        // Initialize slider listener
+        document.addEventListener('DOMContentLoaded', function() {
+            const slider = document.getElementById('depthSlider');
+            slider.addEventListener('input', function() {
+                currentDepth = parseInt(this.value);
+                if (allData) {
+                    displayGraph();
+                }
+            });
+
+            // Load graph data when page loads
+            loadGraphData();
+        });
+        
+        function getNodeParentModule(node) {
+            // First check if node has parent metadata
+            if (node.parent) {
+                return node.parent;
+            }
+            
+            // Fallback: Map LLD nodes to their parent HLD module based on naming patterns
+            const nodeId = node.id;
+            if (nodeId.includes('frontend') || nodeId.includes('catalog') || nodeId.includes('cart') || nodeId.includes('auth')) return 'frontend_module';
+            if (nodeId.includes('service') || nodeId.includes('order') || nodeId.includes('payment') || nodeId.includes('inventory')) return 'backend_module';
+            if (nodeId.includes('database') || nodeId.includes('_db')) return 'database_module';
+            
+            // Original fallback logic
+            if (nodeId.includes('_app') || nodeId.includes('Other')) return 'module_other';
+            if (nodeId.includes('Service') || nodeId.includes('History') || nodeId.includes('Calculator')) return 'module_service_layer';
+            if (nodeId.includes('Validation') || nodeId.includes('Data Processing')) return 'module_utilities';
+            return 'module_other'; // default
+        }
+        
+        function displayGraph() {
+            const elements = [];
+            
+            // Filter nodes by technical depth
+            const filteredNodes = allData.nodes.filter(node => {
+                const nodeDepth = node.technical_depth || (node.level === 'HLD' ? 1 : 3);
+                return nodeDepth <= currentDepth;
+            });
+            
+            if (currentViewMode === 'HIERARCHY') {
+                // Show hierarchical view based on depth
+                if (currentDepth === 1) {
+                    // Business level - show only HLD nodes
+                    const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
+                    hldNodes.forEach((node, index) => {
+                        elements.push({
+                            data: {
+                                id: node.id,
+                                label: node.name || node.id,
+                                type: node.type,
+                                level: node.level,
+                                color: node.color || moduleColors[node.id] || '#f0f0f0'
+                            },
+                            position: {
+                                x: 200 + (index * 350),
+                                y: 200
+                            }
+                        });
+                    });
+                } else {
+                    // System/Implementation levels - show hierarchy
+                    const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
+                    const lldNodes = filteredNodes.filter(node => node.level === 'LLD');
+                
+                    // Add HLD nodes at top level
+                    hldNodes.forEach((node, index) => {
+                        elements.push({
+                            data: {
+                                id: node.id,
+                                label: node.name || node.id,
+                                type: node.type,
+                                level: node.level,
+                                color: node.color || moduleColors[node.id] || '#f0f0f0'
+                            },
+                            position: {
+                                x: 200 + (index * 400),
+                                y: 100
+                            }
+                        });
+                    });
+                
+                    // Group LLD nodes by parent module and position them below
+                    const moduleGroups = {};
+                    
+                    lldNodes.forEach(node => {
+                        const parentModule = getNodeParentModule(node);
+                        const parentColor = node.color || moduleColors[parentModule] || '#f0f0f0';
+                        
+                        if (!moduleGroups[parentModule]) {
+                            moduleGroups[parentModule] = [];
+                        }
+                        
+                        moduleGroups[parentModule].push({
+                            data: {
+                                id: node.id,
+                                label: node.name || node.id,
+                                type: node.type,
+                                level: node.level,
+                                color: parentColor,
+                                parent: parentModule
+                            }
+                        });
+                    });
+                    
+                    // Position LLD nodes in columns under their parent modules
+                    Object.keys(moduleGroups).forEach((moduleId, moduleIndex) => {
+                        const group = moduleGroups[moduleId];
+                        group.forEach((node, nodeIndex) => {
+                            node.position = {
+                                x: 150 + (moduleIndex * 400) + ((nodeIndex % 2) * 100),
+                                y: 250 + (Math.floor(nodeIndex / 2) * 120)
+                            };
+                            elements.push(node);
+                        });
+                    });
+                    
+                    // Add hierarchy edges from HLD to LLD (only at depth 2+)
+                    if (currentDepth >= 2) {
+                        lldNodes.forEach(lldNode => {
+                            const parentModule = getNodeParentModule(lldNode);
+                            elements.push({
+                                data: {
+                                    id: `hierarchy-${parentModule}-${lldNode.id}`,
+                                    source: parentModule,
+                                    target: lldNode.id
+                                }
+                            });
+                        });
+                    }
+                }
+            } else if (currentViewMode === 'CONNECTIONS') {
+                // Show all filtered nodes with full connection view
+                filteredNodes.forEach(node => {
+                    const parentModule = getNodeParentModule(node);
+                    const nodeColor = node.color || moduleColors[node.id] || moduleColors[parentModule] || '#f0f0f0';
+                    
+                    elements.push({
+                        data: {
+                            id: node.id,
+                            label: node.name || node.id,
+                            type: node.type,
+                            level: node.level,
+                            color: nodeColor
+                        }
+                    });
+                });
+                
+                // Add edges with bidirectional arrows and communication labels
+                const addedEdges = new Set();
+                const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
+                
+                allData.edges.forEach(edge => {
+                    // Only show edges between filtered nodes
+                    if (!filteredNodeIds.has(edge.from) || !filteredNodeIds.has(edge.to)) {
+                        return;
+                    }
+                    
+                    const edgeKey = `${edge.from}-${edge.to}`;
+                    const reverseKey = `${edge.to}-${edge.from}`;
+                    
+                    if (!addedEdges.has(edgeKey) && !addedEdges.has(reverseKey)) {
+                        const isBidirectional = edge.bidirectional === true;
+                        const commType = edge.metadata?.communication_type || edge.metadata?.relationship_type || edge.type || '';
+                        
+                        elements.push({
+                            data: {
+                                id: edge.id || edgeKey,
+                                source: edge.from,
+                                target: edge.to,
+                                label: commType,
+                                bidirectional: isBidirectional,
+                                sourceArrowColor: isBidirectional ? '#666666' : 'transparent',
+                                sourceArrowShape: isBidirectional ? 'triangle' : 'none'
+                            }
+                        });
+                        addedEdges.add(edgeKey);
+                    }
+                });
+            }
+            
+            // Update graph
+            cy.elements().remove();
+            cy.add(elements);
+            
+            // Choose layout based on view mode
+            if (currentViewMode === 'HIERARCHY') {
+                // Use preset layout since we're setting positions manually
+                cy.layout({
+                    name: 'preset',
+                    padding: 50
+                }).run();
+            } else {
+                // Use force-directed layout for connections view
+                cy.layout({
+                    name: 'cose',
+                    idealEdgeLength: 120,
+                    nodeOverlap: 30,
+                    refresh: 20,
+                    fit: true,
+                    padding: 50,
+                    randomize: false,
+                    componentSpacing: 150,
+                    nodeRepulsion: 400000,
+                    edgeElasticity: 100,
+                    nestingFactor: 5,
+                    gravity: 80,
+                    numIter: 1000
+                }).run();
+            }
+            
+            setTimeout(() => cy.fit(), 300);
+            
+            // Update PM dashboard info
+            updatePMDashboard();
+        }
+        
+        function updatePMDashboard() {
+            if (!allData || !allData.metadata) return;
+            
+            const pmInfo = document.getElementById('pmInfo');
+            const pmStats = document.getElementById('pmStats');
+            
+            if (allData.metadata.pm_metrics) {
+                const metrics = allData.metadata.pm_metrics;
+                const stats = allData.metadata.statistics;
+                
+                pmStats.innerHTML = `
+                    <div>Completion: ${metrics.completion_percentage || 0}%</div>
+                    <div>Risk Level: ${metrics.risk_level || 'Unknown'}</div>
+                    <div>Active Dependencies: ${metrics.active_dependencies || 0}</div>
+                    <div>Total Components: ${stats.total_nodes || 0}</div>
+                    <div>Depth Level: ${getCurrentDepthLabel()}</div>
+                `;
+                pmInfo.style.display = 'block';
+            }
+        }
+        
+        function getCurrentDepthLabel() {
+            switch(currentDepth) {
+                case 1: return 'Business View';
+                case 2: return 'System View';
+                case 3: return 'Implementation View';
+                default: return 'Unknown';
+            }
+        }
+
+        function goBack() {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html> 

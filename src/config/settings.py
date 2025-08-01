@@ -27,7 +27,7 @@ class Settings:
     LLM_TEMPERATURE: float = float(os.getenv('LLM_TEMPERATURE', '0.1'))
     
     # Quick disable for testing (set to 'false' to disable LLM calls completely)
-    LLM_DISABLE_FOR_TESTING: bool = os.getenv('LLM_DISABLE_FOR_TESTING', 'false').lower() == 'true'
+    LLM_DISABLE_FOR_TESTING: bool = os.getenv('LLM_DISABLE_FOR_TESTING', 'true').lower() == 'true'
     
     @classmethod
     def validate_llm_config(cls) -> bool:

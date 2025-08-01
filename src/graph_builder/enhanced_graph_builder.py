@@ -8,7 +8,11 @@ from pathlib import Path
 from datetime import datetime
 from ..utils.logger import get_logger
 from ..utils.file_utils import FileUtils
-from ..models.schemas import Graph, GraphMetadata, GraphNode, GraphEdge, NodeLevel, NodeType, EdgeType, ComplexityLevel
+from ..models.schemas import (
+    Graph, GraphMetadata, GraphNode, GraphEdge, NodeLevel, NodeType, EdgeType, 
+    ComplexityLevel, TechnicalDepth, RiskLevel, NodeMetadata, PMMetadata, 
+    EnhancedMetadata, PMMetrics, GraphStatistics
+)
 from ..models.graph_models import GraphBuilder
 from ..llm_integration.semantic_analyzer import SemanticAnalyzer
 from ..llm_integration.relationship_mapper import RelationshipMapper
@@ -117,14 +121,42 @@ class EnhancedGraphBuilder:
             self.relationship_results
         )
         
+        # Calculate enhanced statistics
+        total_files = stats['total_files']
+        total_lines = sum(file_data['file_info'].line_count for file_data in parsing_result['parsed_files'].values())
+        
+        # Create graph statistics
+        graph_stats = GraphStatistics(
+            total_nodes=0,  # Will be updated after graph creation
+            hld_nodes=0,    # Will be updated after graph creation
+            lld_nodes=0,    # Will be updated after graph creation
+            total_edges=0,  # Will be updated after graph creation
+            technical_depths={
+                "business": 0,
+                "system": 0,
+                "implementation": 0
+            }
+        )
+        
+        # Create PM metrics
+        pm_metrics = PMMetrics(
+            development_velocity="medium",
+            risk_level=RiskLevel.LOW,
+            completion_percentage=85.0,  # Default completion
+            blocked_components=0,
+            active_dependencies=len(relationship_metrics.get('dependency_chains', []))
+        )
+        
         return GraphMetadata(
             codebase_path=codebase_path,
             analysis_timestamp=datetime.now(),
-            file_count=stats['total_files'],
+            file_count=total_files,
             coverage_percentage=stats['coverage_percentage'],
-            total_lines=sum(file_data['file_info'].line_count for file_data in parsing_result['parsed_files'].values()),
+            total_lines=total_lines,
             languages=list(stats['languages'].keys()),
-            categories=stats['categories']
+            categories=stats['categories'],
+            statistics=graph_stats,
+            pm_metrics=pm_metrics
         )
     
     def _create_enhanced_hld_nodes(self, parsing_result: Dict[str, Any]) -> Dict[str, GraphNode]:
@@ -384,7 +416,7 @@ class EnhancedGraphBuilder:
         }
     
     def _create_enhanced_node_metadata(self, files: List[str], parsing_result: Dict[str, Any], 
-                                     semantic_result: Dict[str, Any]) -> Dict[str, Any]:
+                                     semantic_result: Dict[str, Any]) -> NodeMetadata:
         """Create enhanced metadata for a node with semantic analysis."""
         total_lines = 0
         total_size = 0
@@ -395,20 +427,33 @@ class EnhancedGraphBuilder:
                 total_lines += file_info.line_count
                 total_size += file_info.size
         
-        return {
-            'purpose': semantic_result.get('purpose', f"Contains {len(files)} files"),
-            'complexity': semantic_result.get('complexity', ComplexityLevel.MEDIUM),
-            'dependencies': [],
-            'line_count': total_lines,
-            'file_size': total_size,
-            'language': 'python',
-            'category': 'backend',
-            'semantic_analysis': semantic_result
-        }
+        # Determine technical depth based on node level (HLD = business, LLD = implementation)
+        technical_depth = TechnicalDepth.BUSINESS  # Default for HLD nodes
+        
+        # Determine color based on component type
+        color = self._get_node_color(semantic_result.get('component_type', NodeType.MODULE))
+        
+        return NodeMetadata(
+            purpose=semantic_result.get('purpose', f"Contains {len(files)} files"),
+            complexity=semantic_result.get('complexity', ComplexityLevel.MEDIUM),
+            dependencies=[],
+            line_count=total_lines,
+            file_size=total_size,
+            language='python',
+            category='backend',
+            technical_depth=technical_depth,
+            color=color,
+            size=len(files) * 10,  # Size based on number of files
+            agent_touched=False,  # Will be updated by agent detection
+            agent_types=[],
+            risk_level=RiskLevel.LOW,
+            business_impact=None,
+            agent_context=None
+        )
     
     def _create_enhanced_function_metadata(self, func_name: str, file_path: str, 
                                          parsing_result: Dict[str, Any], 
-                                         semantic_result: Dict[str, Any]) -> Dict[str, Any]:
+                                         semantic_result: Dict[str, Any]) -> NodeMetadata:
         """Create enhanced metadata for a function with semantic analysis."""
         file_data = parsing_result['parsed_files'].get(file_path, {})
         file_info = file_data.get('file_info')
@@ -418,21 +463,27 @@ class EnhancedGraphBuilder:
             file_path, self.relationship_results
         )
         
-        return {
-            'purpose': f"Function: {func_name}",
-            'complexity': semantic_result.get('complexity', ComplexityLevel.LOW),
-            'dependencies': file_data.get('imports', []),
-            'line_count': file_info.line_count if file_info else 0,
-            'file_size': file_info.size if file_info else 0,
-            'language': file_info.language if file_info else 'python',
-            'category': file_info.category if file_info else 'backend',
-            'semantic_analysis': semantic_result,
-            'relationships': relationship_summary
-        }
+        return NodeMetadata(
+            purpose=f"Function: {func_name}",
+            complexity=semantic_result.get('complexity', ComplexityLevel.LOW),
+            dependencies=file_data.get('imports', []),
+            line_count=file_info.line_count if file_info else 0,
+            file_size=file_info.size if file_info else 0,
+            language=file_info.language if file_info else 'python',
+            category=file_info.category if file_info else 'backend',
+            technical_depth=TechnicalDepth.IMPLEMENTATION,
+            color=self._get_node_color(NodeType.FUNCTION),
+            size=5,  # Small size for functions
+            agent_touched=False,
+            agent_types=[],
+            risk_level=RiskLevel.LOW,
+            business_impact=None,
+            agent_context=None
+        )
     
     def _create_enhanced_class_metadata(self, class_name: str, file_path: str, 
                                       parsing_result: Dict[str, Any], 
-                                      semantic_result: Dict[str, Any]) -> Dict[str, Any]:
+                                      semantic_result: Dict[str, Any]) -> NodeMetadata:
         """Create enhanced metadata for a class with semantic analysis."""
         file_data = parsing_result['parsed_files'].get(file_path, {})
         file_info = file_data.get('file_info')
@@ -442,17 +493,23 @@ class EnhancedGraphBuilder:
             file_path, self.relationship_results
         )
         
-        return {
-            'purpose': f"Class: {class_name}",
-            'complexity': semantic_result.get('complexity', ComplexityLevel.MEDIUM),
-            'dependencies': file_data.get('imports', []),
-            'line_count': file_info.line_count if file_info else 0,
-            'file_size': file_info.size if file_info else 0,
-            'language': file_info.language if file_info else 'python',
-            'category': file_info.category if file_info else 'backend',
-            'semantic_analysis': semantic_result,
-            'relationships': relationship_summary
-        }
+        return NodeMetadata(
+            purpose=f"Class: {class_name}",
+            complexity=semantic_result.get('complexity', ComplexityLevel.MEDIUM),
+            dependencies=file_data.get('imports', []),
+            line_count=file_info.line_count if file_info else 0,
+            file_size=file_info.size if file_info else 0,
+            language=file_info.language if file_info else 'python',
+            category=file_info.category if file_info else 'backend',
+            technical_depth=TechnicalDepth.IMPLEMENTATION,
+            color=self._get_node_color(NodeType.CLASS),
+            size=8,  # Medium size for classes
+            agent_touched=False,
+            agent_types=[],
+            risk_level=RiskLevel.LOW,
+            business_impact=None,
+            agent_context=None
+        )
     
     def _find_parent_hld_node(self, file_path: str, hld_nodes: Dict[str, GraphNode]) -> Optional[GraphNode]:
         """Find the HLD node that contains a given file."""
@@ -533,6 +590,54 @@ class EnhancedGraphBuilder:
             for issue in validation_issues:
                 logger.warning(f"  - {issue}")
         
+        # Update graph statistics
+        hld_nodes = [node for node in graph.nodes if node.level == NodeLevel.HLD]
+        lld_nodes = [node for node in graph.nodes if node.level == NodeLevel.LLD]
+        
+        # Count nodes by technical depth
+        technical_depths = {
+            "business": len(hld_nodes),
+            "system": len([n for n in graph.nodes if n.metadata.technical_depth == TechnicalDepth.SYSTEM]),
+            "implementation": len([n for n in graph.nodes if n.metadata.technical_depth == TechnicalDepth.IMPLEMENTATION])
+        }
+        
+        # Update graph statistics
+        graph.metadata.statistics = GraphStatistics(
+            total_nodes=len(graph.nodes),
+            hld_nodes=len(hld_nodes),
+            lld_nodes=len(lld_nodes),
+            total_edges=len(graph.edges),
+            technical_depths=technical_depths
+        )
+        
+        # Update PM metrics
+        if graph.metadata.pm_metrics:
+            # Calculate completion percentage based on node complexity
+            total_complexity = sum(
+                {"low": 1, "medium": 2, "high": 3}.get(node.metadata.complexity.value, 1)
+                for node in graph.nodes
+            )
+            avg_complexity = total_complexity / len(graph.nodes) if graph.nodes else 1
+            
+            # Estimate completion based on complexity and node count
+            completion_percentage = min(95.0, max(10.0, 100 - (avg_complexity * 10)))
+            
+            # Determine risk level based on complexity and agent usage
+            high_complexity_nodes = [n for n in graph.nodes if n.metadata.complexity == ComplexityLevel.HIGH]
+            agent_touched_nodes = [n for n in graph.nodes if n.metadata.agent_touched]
+            
+            risk_level = RiskLevel.LOW
+            if len(agent_touched_nodes) > 0:
+                risk_level = RiskLevel.MEDIUM
+            if len(high_complexity_nodes) > len(graph.nodes) * 0.3:
+                risk_level = RiskLevel.HIGH
+            if len(agent_touched_nodes) > len(graph.nodes) * 0.2:
+                risk_level = RiskLevel.CRITICAL
+            
+            graph.metadata.pm_metrics.completion_percentage = completion_percentage
+            graph.metadata.pm_metrics.risk_level = risk_level
+            graph.metadata.pm_metrics.active_dependencies = len(graph.edges)
+        
         # Enrich with semantic analysis statistics
         semantic_stats = self.semantic_analyzer.get_analysis_statistics()
         relationship_metrics = self.relationship_mapper.calculate_dependency_metrics(
@@ -559,3 +664,23 @@ class EnhancedGraphBuilder:
                 'dependency_analysis': True
             }
         } 
+
+    def _get_node_color(self, node_type: NodeType) -> str:
+        """Get color for node based on type."""
+        color_map = {
+            NodeType.MODULE: '#9013FE',
+            NodeType.API: '#4A90E2',
+            NodeType.SERVICE: '#D0021B',
+            NodeType.DATABASE: '#FF9800',
+            NodeType.CLIENT: '#4CAF50',
+            NodeType.APPLICATION: '#2196F3',
+            NodeType.COMPONENT: '#9C27B0',
+            NodeType.FUNCTION: '#607D8B',
+            NodeType.CLASS: '#795548',
+            NodeType.FUNCTION_GROUP: '#FF5722',
+            NodeType.UTILITY: '#00BCD4',
+            NodeType.CONTROLLER: '#8BC34A',
+            NodeType.MODEL: '#FFC107',
+            NodeType.TEST: '#E91E63'
+        }
+        return color_map.get(node_type, '#f0f0f0') 

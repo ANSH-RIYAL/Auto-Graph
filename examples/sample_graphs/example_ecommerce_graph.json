@@ -1,0 +1,391 @@
+{
+  "metadata": {
+    "export_timestamp": "2025-08-01T08:35:00.000000",
+    "export_format": "pm_dashboard_json",
+    "version": "2.0",
+    "graph_metadata": {
+      "project_name": "E-commerce Platform",
+      "analysis_timestamp": "2025-08-01T08:35:00.000000",
+      "file_count": 45,
+      "coverage_percentage": 98.5,
+      "total_lines": 12500,
+      "languages": ["React", "Node.js", "PostgreSQL"],
+      "categories": {
+        "frontend": 15,
+        "backend": 20,
+        "database": 5,
+        "integration": 5
+      }
+    },
+    "statistics": {
+      "total_nodes": 12,
+      "hld_nodes": 3,
+      "lld_nodes": 9,
+      "total_edges": 18,
+      "technical_depths": {
+        "business": 3,
+        "system": 6,
+        "implementation": 9
+      }
+    },
+    "pm_metrics": {
+      "development_velocity": "high",
+      "risk_level": "medium",
+      "completion_percentage": 75,
+      "blocked_components": 0,
+      "active_dependencies": 9
+    }
+  },
+  "nodes": [
+    {
+      "id": "frontend_module",
+      "name": "Customer Experience",
+      "type": "Frontend",
+      "level": "HLD",
+      "technical_depth": 1,
+      "color": "#4CAF50",
+      "size": 10,
+      "metadata": {
+        "purpose": "User interface and client-side logic",
+        "complexity": "high",
+        "dependencies": ["backend_module"],
+        "line_count": 2500,
+        "language": "React/TypeScript",
+        "category": "frontend"
+      },
+      "pm_metadata": {
+        "business_value": "Customer interaction and conversion",
+        "development_status": "In Progress",
+        "completion_percentage": 80,
+        "team_size": 4,
+        "estimated_completion": "2025-08-15",
+        "risk_factors": ["UI/UX complexity", "Mobile responsiveness"],
+        "stakeholder_priority": "high"
+      },
+      "enhanced_metadata": {
+        "total_symbols": 25,
+        "has_parent": false,
+        "has_children": true,
+        "child_count": 3,
+        "file_diversity": 15,
+        "complexity_score": 4
+      }
+    },
+    {
+      "id": "backend_module", 
+      "name": "Business Logic",
+      "type": "Backend",
+      "level": "HLD",
+      "technical_depth": 1,
+      "color": "#2196F3",
+      "size": 10,
+      "metadata": {
+        "purpose": "Business logic and API endpoints",
+        "complexity": "high",
+        "dependencies": ["database_module"],
+        "line_count": 3200,
+        "language": "Node.js/Express",
+        "category": "backend"
+      },
+      "pm_metadata": {
+        "business_value": "Core business operations and scalability",
+        "development_status": "Active",
+        "completion_percentage": 70,
+        "team_size": 6,
+        "estimated_completion": "2025-08-20",
+        "risk_factors": ["Payment integration", "Order processing complexity"],
+        "stakeholder_priority": "critical"
+      },
+      "enhanced_metadata": {
+        "total_symbols": 35,
+        "has_parent": false,
+        "has_children": true,
+        "child_count": 3,
+        "file_diversity": 20,
+        "complexity_score": 5
+      }
+    },
+    {
+      "id": "database_module",
+      "name": "Data Management",
+      "type": "Database", 
+      "level": "HLD",
+      "technical_depth": 1,
+      "color": "#FF9800",
+      "size": 8,
+      "metadata": {
+        "purpose": "Data storage and persistence",
+        "complexity": "medium",
+        "dependencies": [],
+        "line_count": 800,
+        "language": "SQL/MongoDB",
+        "category": "database"
+      },
+      "pm_metadata": {
+        "business_value": "Data reliability and performance",
+        "development_status": "Stable",
+        "completion_percentage": 90,
+        "team_size": 2,
+        "estimated_completion": "2025-08-10",
+        "risk_factors": ["Data migration", "Performance scaling"],
+        "stakeholder_priority": "high"
+      },
+      "enhanced_metadata": {
+        "total_symbols": 12,
+        "has_parent": false,
+        "has_children": true,
+        "child_count": 3,
+        "file_diversity": 5,
+        "complexity_score": 3
+      }
+    },
+    {
+      "id": "product_catalog",
+      "name": "Product Catalog",
+      "type": "Component",
+      "level": "LLD",
+      "technical_depth": 2,
+      "color": "#4CAF50",
+      "size": 6,
+      "metadata": {
+        "purpose": "Display and browse products",
+        "complexity": "medium",
+        "parent_module": "frontend_module"
+      }
+    },
+    {
+      "id": "shopping_cart",
+      "name": "Shopping Cart",
+      "type": "Component",
+      "level": "LLD",
+      "technical_depth": 2,
+      "color": "#4CAF50",
+      "size": 6,
+      "metadata": {
+        "purpose": "Manage cart items and checkout",
+        "complexity": "medium",
+        "parent_module": "frontend_module"
+      }
+    },
+    {
+      "id": "user_authentication",
+      "name": "User Auth",
+      "type": "Component",
+      "level": "LLD",
+      "technical_depth": 3,
+      "color": "#4CAF50",
+      "size": 5,
+      "metadata": {
+        "purpose": "User login and registration",
+        "complexity": "medium",
+        "parent_module": "frontend_module"
+      }
+    },
+    {
+      "id": "order_service",
+      "name": "Order Management",
+      "type": "Service",
+      "level": "LLD",
+      "technical_depth": 2,
+      "color": "#2196F3",
+      "size": 7,
+      "metadata": {
+        "purpose": "Process and track orders",
+        "complexity": "high",
+        "parent_module": "backend_module"
+      }
+    },
+    {
+      "id": "payment_service",
+      "name": "Payment Gateway",
+      "type": "Service",
+      "level": "LLD",
+      "technical_depth": 3,
+      "color": "#2196F3",
+      "size": 7,
+      "metadata": {
+        "purpose": "Handle payment processing",
+        "complexity": "high",
+        "parent_module": "backend_module"
+      }
+    },
+    {
+      "id": "inventory_service",
+      "name": "Inventory Control",
+      "type": "Service",
+      "level": "LLD",
+      "technical_depth": 2,
+      "color": "#2196F3",
+      "size": 6,
+      "metadata": {
+        "purpose": "Manage product stock",
+        "complexity": "medium",
+        "parent_module": "backend_module"
+      }
+    },
+    {
+      "id": "user_database",
+      "name": "User DB",
+      "type": "Database",
+      "level": "LLD",
+      "technical_depth": 3,
+      "color": "#FF9800",
+      "size": 5,
+      "metadata": {
+        "purpose": "Store user accounts and profiles",
+        "complexity": "low",
+        "parent_module": "database_module"
+      }
+    },
+    {
+      "id": "product_database",
+      "name": "Product DB",
+      "type": "Database",
+      "level": "LLD",
+      "technical_depth": 3,
+      "color": "#FF9800",
+      "size": 6,
+      "metadata": {
+        "purpose": "Store product information",
+        "complexity": "medium",
+        "parent_module": "database_module"
+      }
+    },
+    {
+      "id": "order_database",
+      "name": "Order DB",
+      "type": "Database",
+      "level": "LLD",
+      "technical_depth": 3,
+      "color": "#FF9800",
+      "size": 5,
+      "metadata": {
+        "purpose": "Store order history and tracking",
+        "complexity": "medium",
+        "parent_module": "database_module"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "product_catalog_to_inventory",
+      "from": "product_catalog",
+      "to": "inventory_service",
+      "type": "data_request",
+      "bidirectional": true,
+      "metadata": {
+        "relationship_type": "queries",
+        "description": "Fetches product availability",
+        "communication_type": "Stock Data",
+        "frequency": "real-time",
+        "data_format": "JSON API"
+      },
+      "pm_metadata": {
+        "business_impact": "Product display accuracy",
+        "failure_consequence": "Out-of-stock items shown",
+        "sla_requirement": "< 200ms",
+        "monitoring_alerts": ["inventory_sync_failure", "response_timeout"]
+      }
+    },
+    {
+      "id": "shopping_cart_to_order",
+      "from": "shopping_cart",
+      "to": "order_service",
+      "type": "action",
+      "bidirectional": false,
+      "metadata": {
+        "relationship_type": "creates",
+        "description": "Submits order for processing",
+        "communication_type": "Order Request",
+        "frequency": "on-demand",
+        "data_format": "JSON POST"
+      },
+      "pm_metadata": {
+        "business_impact": "Revenue generation",
+        "failure_consequence": "Lost sales",
+        "sla_requirement": "< 500ms",
+        "monitoring_alerts": ["order_submission_failure", "cart_abandonment"]
+      }
+    },
+    {
+      "id": "shopping_cart_to_payment",
+      "from": "shopping_cart",
+      "to": "payment_service",
+      "type": "action",
+      "bidirectional": true,
+      "metadata": {
+        "relationship_type": "processes",
+        "description": "Initiates payment flow",
+        "communication_type": "Payment Data",
+        "frequency": "on-demand",
+        "data_format": "Encrypted JSON"
+      },
+      "pm_metadata": {
+        "business_impact": "Payment conversion",
+        "failure_consequence": "Payment failures",
+        "sla_requirement": "< 1s",
+        "monitoring_alerts": ["payment_timeout", "encryption_error"]
+      }
+    },
+    {
+      "id": "user_auth_to_user_db",
+      "from": "user_authentication",
+      "to": "user_database",
+      "type": "data_request",
+      "metadata": {
+        "relationship_type": "authenticates",
+        "description": "Validates user credentials"
+      }
+    },
+    {
+      "id": "order_service_to_order_db",
+      "from": "order_service",
+      "to": "order_database",
+      "type": "data_storage",
+      "metadata": {
+        "relationship_type": "stores",
+        "description": "Saves order information"
+      }
+    },
+    {
+      "id": "order_service_to_inventory",
+      "from": "order_service",
+      "to": "inventory_service",
+      "type": "update",
+      "metadata": {
+        "relationship_type": "updates",
+        "description": "Reduces stock after order"
+      }
+    },
+    {
+      "id": "payment_service_to_order",
+      "from": "payment_service",
+      "to": "order_service",
+      "type": "notification",
+      "metadata": {
+        "relationship_type": "confirms",
+        "description": "Notifies payment completion"
+      }
+    },
+    {
+      "id": "inventory_service_to_product_db",
+      "from": "inventory_service",
+      "to": "product_database",
+      "type": "data_request",
+      "metadata": {
+        "relationship_type": "reads",
+        "description": "Checks product details"
+      }
+    },
+    {
+      "id": "product_catalog_to_product_db",
+      "from": "product_catalog",
+      "to": "product_database",
+      "type": "data_request",
+      "metadata": {
+        "relationship_type": "displays",
+        "description": "Shows product information"
+      }
+    }
+  ]
+}
