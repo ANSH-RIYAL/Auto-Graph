@@ -138,6 +138,37 @@
             color: #666;
         }
         
+        .stats-panel {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 12px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .stats-panel h4 {
+            margin: 0 0 8px 0;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+            color: #666;
+        }
+        
+        .stat-label {
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #333;
+        }
+        
         button {
             margin: 3px;
             padding: 8px 12px;
@@ -183,6 +214,8 @@
         <div class="view-controls">
             <button class="mode-btn active" onclick="setViewMode('HIERARCHY')" id="hierarchyBtn">Hierarchy View</button>
             <button class="mode-btn" onclick="setViewMode('CONNECTIONS')" id="connectionsBtn">All Connections</button>
+            <button class="mode-btn" onclick="setViewMode('HLD')" id="hldBtn">HLD Only</button>
+            <button class="mode-btn" onclick="setViewMode('LLD')" id="lldBtn">LLD Only</button>
         </div>
         <button onclick="cy.fit()">Fit All</button>
         <button onclick="cy.center()">Center</button>
@@ -190,6 +223,27 @@
         <div class="pm-info" id="pmInfo" style="display: none;">
             <h4>Project Dashboard</h4>
             <div id="pmStats"></div>
+        </div>
+        
+        <!-- Analysis Statistics -->
+        <div class="stats-panel" id="statsPanel">
+            <h4>Analysis Statistics</h4>
+            <div class="stat-item">
+                <span class="stat-label">Files:</span>
+                <span class="stat-value" id="fileCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">HLD Nodes:</span>
+                <span class="stat-value" id="hldCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">LLD Nodes:</span>
+                <span class="stat-value" id="lldCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Edges:</span>
+                <span class="stat-value" id="edgeCount">0</span>
+            </div>
         </div>
     </div>
     <div id="cy"></div>
@@ -372,6 +426,8 @@
             currentViewMode = mode;
             document.getElementById('hierarchyBtn').classList.toggle('active', mode === 'HIERARCHY');
             document.getElementById('connectionsBtn').classList.toggle('active', mode === 'CONNECTIONS');
+            document.getElementById('hldBtn').classList.toggle('active', mode === 'HLD');
+            document.getElementById('lldBtn').classList.toggle('active', mode === 'LLD');
             
             if (allData) {
                 displayGraph();
@@ -420,11 +476,19 @@
                 return nodeDepth <= currentDepth;
             });
             
-            if (currentViewMode === 'HIERARCHY') {
+            if (currentViewMode === 'HIERARCHY' || currentViewMode === 'HLD' || currentViewMode === 'LLD') {
+                // Filter nodes based on view mode
+                let displayNodes = filteredNodes;
+                if (currentViewMode === 'HLD') {
+                    displayNodes = filteredNodes.filter(node => node.level === 'HLD');
+                } else if (currentViewMode === 'LLD') {
+                    displayNodes = filteredNodes.filter(node => node.level === 'LLD');
+                }
+                
                 // Show hierarchical view based on depth
-                if (currentDepth === 1) {
+                if (currentDepth === 1 || currentViewMode === 'HLD') {
                     // Business level - show only HLD nodes
-                    const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
+                    const hldNodes = displayNodes.filter(node => node.level === 'HLD');
                     hldNodes.forEach((node, index) => {
                         elements.push({
                             data: {
@@ -442,8 +506,8 @@
                     });
                 } else {
                     // System/Implementation levels - show hierarchy
-                    const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
-                    const lldNodes = filteredNodes.filter(node => node.level === 'LLD');
+                    const hldNodes = displayNodes.filter(node => node.level === 'HLD');
+                    const lldNodes = displayNodes.filter(node => node.level === 'LLD');
                 
                     // Add HLD nodes at top level
                     hldNodes.forEach((node, index) => {
@@ -595,6 +659,9 @@
             
             // Update PM dashboard info
             updatePMDashboard();
+            
+            // Update statistics panel
+            updateStatistics();
         }
         
         function updatePMDashboard() {
@@ -624,6 +691,18 @@
                 case 2: return 'System View';
                 case 3: return 'Implementation View';
                 default: return 'Unknown';
+            }
+        }
+        
+        function updateStatistics() {
+            if (!allData) return;
+            
+            const stats = allData.metadata.statistics;
+            if (stats) {
+                document.getElementById('fileCount').textContent = stats.total_files || 0;
+                document.getElementById('hldCount').textContent = stats.hld_nodes || 0;
+                document.getElementById('lldCount').textContent = stats.lld_nodes || 0;
+                document.getElementById('edgeCount').textContent = stats.total_edges || 0;
             }
         }
 

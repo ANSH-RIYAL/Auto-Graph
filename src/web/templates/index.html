@@ -23,21 +23,6 @@
                     </div>
                 </div>
                 <div class="header-right">
-                    <div class="depth-controls">
-                        <div class="depth-label">Technical Depth:</div>
-                        <div class="slider-container">
-                            <input type="range" id="depthSlider" min="1" max="3" value="1" class="depth-slider">
-                            <div class="slider-labels">
-                                <span>Business</span>
-                                <span>System</span>
-                                <span>Implementation</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="view-controls">
-                        <button class="mode-btn active" onclick="setViewMode('HIERARCHY')" id="hierarchyBtn">Hierarchy View</button>
-                        <button class="mode-btn" onclick="setViewMode('CONNECTIONS')" id="connectionsBtn">All Connections</button>
-                    </div>
                     <button class="help-btn">
                         <i class="fas fa-question-circle"></i>
                     </button>
@@ -102,6 +87,118 @@
                     </div>
                 </div>
 
+                <!-- Analysis Statistics -->
+                <div class="sidebar-section" id="statsSection" style="display: none;">
+                    <h2>Analysis Statistics</h2>
+                    <div class="stats-content">
+                        <div class="stat-item">
+                            <span class="stat-label">Files Analyzed</span>
+                            <span class="stat-value" id="filesAnalyzed">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Coverage</span>
+                            <span class="stat-value" id="coveragePercent">0%</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">HLD Nodes</span>
+                            <span class="stat-value" id="hldNodes">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">LLD Nodes</span>
+                            <span class="stat-value" id="lldNodes">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Total Edges</span>
+                            <span class="stat-value" id="totalEdges">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Team Progress -->
+                <div class="sidebar-section" id="teamProgressSection" style="display: none;">
+                    <h2>Team Progress</h2>
+                    <div class="team-progress-content">
+                        <div class="team-item">
+                            <div class="team-header">
+                                <span class="team-name">Backend Team</span>
+                                <span class="team-percentage" id="backendProgress">70%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="backendProgressFill" style="width: 70%"></div>
+                            </div>
+                        </div>
+                        <div class="team-item">
+                            <div class="team-header">
+                                <span class="team-name">Data Team</span>
+                                <span class="team-percentage" id="dataProgress">90%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="dataProgressFill" style="width: 90%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Component Health -->
+                <div class="sidebar-section" id="healthSection" style="display: none;">
+                    <h2>Component Health</h2>
+                    <div class="health-content">
+                        <div class="health-item">
+                            <div class="health-indicator healthy"></div>
+                            <span class="health-label">Code Quality</span>
+                            <span class="health-value" id="codeQuality">--</span>
+                        </div>
+                        <div class="health-item">
+                            <div class="health-indicator warning"></div>
+                            <span class="health-label">Complexity</span>
+                            <span class="health-value" id="complexity">--</span>
+                        </div>
+                        <div class="health-item">
+                            <div class="health-indicator healthy"></div>
+                            <span class="health-label">Dependencies</span>
+                            <span class="health-value" id="dependencies">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Critical Dependencies -->
+                <div class="sidebar-section" id="dependenciesSection" style="display: none;">
+                    <h2>Critical Dependencies</h2>
+                    <div class="dependencies-content">
+                        <div class="dependency-item">
+                            <span class="dependency-name">Payment Service</span>
+                            <span class="dependency-status warning">Update Required</span>
+                        </div>
+                        <div class="dependency-item">
+                            <span class="dependency-name">User Authentication</span>
+                            <span class="dependency-status stable">Stable</span>
+                        </div>
+                        <div class="dependency-item">
+                            <span class="dependency-name">Database</span>
+                            <span class="dependency-status healthy">Healthy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="sidebar-section" id="activitySection" style="display: none;">
+                    <h2>Recent Activity</h2>
+                    <div class="activity-content" id="activityContent">
+                        <div class="activity-item">
+                            <span class="activity-time">7:06:58 AM</span>
+                            <span class="activity-message">Payment integration updated</span>
+                        </div>
+                        <div class="activity-item">
+                            <span class="activity-time">7:06:58 AM</span>
+                            <span class="activity-message">Mobile UI tests passing</span>
+                        </div>
+                        <div class="activity-item">
+                            <span class="activity-time">7:06:58 AM</span>
+                            <span class="activity-message">Database migration complete</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Export Panel -->
                 <div class="sidebar-section" id="exportSection" style="display: none;">
                     <h2>Export Formats</h2>
@@ -147,13 +244,32 @@
             <div class="graph-area">
                 <div class="graph-toolbar">
                     <div class="toolbar-left">
-                        <h2 id="graphTitle">Enhanced Graph Visualization</h2>
-                        <div class="graph-stats">
-                            <span id="nodeCount">0 nodes</span>
-                            <span>•</span>
-                            <span id="edgeCount">0 connections</span>
-                            <span>•</span>
-                            <span id="depthLabel">Business View</span>
+                        <div class="title-section">
+                            <h2 id="graphTitle">Enhanced Graph Visualization</h2>
+                            <div class="graph-stats">
+                                <span id="nodeCount">0 nodes</span>
+                                <span>•</span>
+                                <span id="edgeCount">0 connections</span>
+                                <span>•</span>
+                                <span id="depthLabel">Business View</span>
+                            </div>
+                        </div>
+                        <div class="controls-section">
+                            <div class="depth-controls">
+                                <div class="depth-label">Technical Depth:</div>
+                                <div class="slider-container">
+                                    <input type="range" id="depthSlider" min="1" max="3" value="1" class="depth-slider">
+                                    <div class="slider-labels">
+                                        <span>Business</span>
+                                        <span>System</span>
+                                        <span>Implementation</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="view-controls">
+                                <button class="mode-btn active" onclick="setViewMode('HIERARCHY')" id="hierarchyBtn">Hierarchy View</button>
+                                <button class="mode-btn" onclick="setViewMode('CONNECTIONS')" id="connectionsBtn">All Connections</button>
+                            </div>
                         </div>
                     </div>
                     <div class="toolbar-right">

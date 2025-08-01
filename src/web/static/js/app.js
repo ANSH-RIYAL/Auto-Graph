@@ -9,12 +9,24 @@ let cy = null;
 
 // Color mapping for HLD modules
 const moduleColors = {
-    'module_service_layer': '#9013FE',
-    'module_utilities': '#D0021B', 
-    'module_other': '#4A90E2',
+    'module_service_layer': '#D0021B',
+    'module_utilities': '#00BCD4', 
+    'module_other': '#607D8B',
+    'module_data_models': '#FFC107',
     'frontend_module': '#4CAF50',
     'backend_module': '#2196F3',
-    'database_module': '#FF9800'
+    'database_module': '#FF9800',
+    'Service': '#D0021B',
+    'Model': '#FFC107',
+    'Utility': '#00BCD4',
+    'Module': '#607D8B',
+    'API': '#4A90E2',
+    'Application': '#2196F3',
+    'Component': '#9C27B0',
+    'Function': '#607D8B',
+    'Class': '#795548',
+    'Controller': '#8BC34A',
+    'Test': '#E91E63'
 };
 
 // DOM elements
@@ -42,6 +54,34 @@ const elements = {
     // Export
     exportSection: document.getElementById('exportSection'),
     exportBtns: document.querySelectorAll('.export-btn'),
+    
+    // Statistics
+    statsSection: document.getElementById('statsSection'),
+    filesAnalyzed: document.getElementById('filesAnalyzed'),
+    coveragePercent: document.getElementById('coveragePercent'),
+    hldNodes: document.getElementById('hldNodes'),
+    lldNodes: document.getElementById('lldNodes'),
+    totalEdges: document.getElementById('totalEdges'),
+    
+    // Team Progress
+    teamProgressSection: document.getElementById('teamProgressSection'),
+    backendProgress: document.getElementById('backendProgress'),
+    backendProgressFill: document.getElementById('backendProgressFill'),
+    dataProgress: document.getElementById('dataProgress'),
+    dataProgressFill: document.getElementById('dataProgressFill'),
+    
+    // Health
+    healthSection: document.getElementById('healthSection'),
+    codeQuality: document.getElementById('codeQuality'),
+    complexity: document.getElementById('complexity'),
+    dependencies: document.getElementById('dependencies'),
+    
+    // Dependencies
+    dependenciesSection: document.getElementById('dependenciesSection'),
+    
+    // Activity
+    activitySection: document.getElementById('activitySection'),
+    activityContent: document.getElementById('activityContent'),
     
     // PM Info
     pmInfo: document.getElementById('pmInfo'),
@@ -98,52 +138,96 @@ function initializeCytoscape() {
                     'text-valign': 'center',
                     'text-halign': 'center',
                     'background-color': 'data(color)',
-                    'color': '#000000',
-                    'border-width': 2,
-                    'border-color': '#333333',
+                    'color': '#ffffff',
+                    'border-width': 3,
+                    'border-color': '#2c3e50',
                     'shape': 'roundrectangle',
                     'width': 120,
                     'height': 60,
-                    'font-size': '11px',
+                    'font-size': '12px',
+                    'font-weight': 'bold',
                     'text-wrap': 'wrap',
-                    'text-max-width': '100px'
+                    'text-max-width': '100px',
+                    'text-outline-width': 2,
+                    'text-outline-color': '#2c3e50',
+                    'text-outline-opacity': 0.8,
+                    'opacity': 1
                 }
             },
             {
                 selector: 'node[level = "HLD"]',
                 style: {
                     'border-width': 4,
-                    'border-color': '#000000',
+                    'border-color': '#1a1a1a',
                     'width': 150,
                     'height': 80,
-                    'font-size': '13px',
-                    'font-weight': 'bold'
+                    'font-size': '14px',
+                    'font-weight': 'bold',
+                    'text-outline-width': 3,
+                    'text-outline-color': '#1a1a1a',
+                    'opacity': 1
+                }
+            },
+            {
+                selector: 'node[level = "LLD"]',
+                style: {
+                    'border-width': 2,
+                    'border-color': '#34495e',
+                    'width': 100,
+                    'height': 50,
+                    'font-size': '11px',
+                    'text-outline-width': 2,
+                    'text-outline-color': '#34495e',
+                    'opacity': 1
                 }
             },
             {
                 selector: 'edge',
                 style: {
-                    'width': 3,
-                    'line-color': '#666666',
-                    'target-arrow-color': '#666666',
+                    'width': 4,
+                    'line-color': '#34495e',
+                    'target-arrow-color': '#34495e',
                     'target-arrow-shape': 'triangle',
+                    'target-arrow-width': 8,
                     'source-arrow-color': 'data(sourceArrowColor)',
                     'source-arrow-shape': 'data(sourceArrowShape)',
+                    'source-arrow-width': 8,
                     'curve-style': 'bezier',
                     'content': 'data(label)',
-                    'font-size': '10px',
+                    'font-size': '11px',
+                    'font-weight': 'bold',
                     'text-rotation': 'autorotate',
-                    'text-margin-y': -12,
+                    'text-margin-y': -15,
                     'text-background-color': 'white',
-                    'text-background-opacity': 0.8,
-                    'text-background-padding': 2
+                    'text-background-opacity': 0.9,
+                    'text-background-padding': 4,
+                    'text-border-color': '#34495e',
+                    'text-border-width': 1,
+                    'text-border-opacity': 0.5,
+                    'text-outline-width': 1,
+                    'text-outline-color': 'white',
+                    'text-outline-opacity': 0.8,
+                    'opacity': 1
                 }
             },
             {
                 selector: 'edge[bidirectional = "true"]',
                 style: {
                     'source-arrow-shape': 'triangle',
-                    'source-arrow-color': '#666666'
+                    'source-arrow-color': '#34495e',
+                    'source-arrow-width': 8,
+                    'opacity': 1
+                }
+            },
+            {
+                selector: 'edge[type = "data_flow"]',
+                style: {
+                    'line-color': '#e74c3c',
+                    'target-arrow-color': '#e74c3c',
+                    'source-arrow-color': '#e74c3c',
+                    'width': 6,
+                    'line-style': 'solid',
+                    'opacity': 1
                 }
             }
         ],
@@ -214,6 +298,55 @@ function updateDepthLabel() {
     elements.depthLabel.textContent = labels[currentDepth - 1];
 }
 
+// Get data flow types between modules
+function getDataFlowTypes(sourceNode, targetNode) {
+    const sourceType = sourceNode.type || sourceNode.name || '';
+    const targetType = targetNode.type || targetNode.name || '';
+    
+    // Service Layer connections
+    if (sourceType.includes('Service') || targetType.includes('Service')) {
+        if (sourceType.includes('Model') || targetType.includes('Model')) {
+            return 'Calculation Data, History Records';
+        }
+        if (sourceType.includes('Utility') || targetType.includes('Utility')) {
+            return 'Validation Results, Processed Data';
+        }
+        if (sourceType.includes('Other') || targetType.includes('Other')) {
+            return 'User Input, Configuration';
+        }
+    }
+    
+    // Data Models connections
+    if (sourceType.includes('Model') || targetType.includes('Model')) {
+        if (sourceType.includes('Utility') || targetType.includes('Utility')) {
+            return 'Formatted Data, Validation Rules';
+        }
+        if (sourceType.includes('Other') || targetType.includes('Other')) {
+            return 'Raw Data, Schema Definitions';
+        }
+    }
+    
+    // Utilities connections
+    if (sourceType.includes('Utility') || targetType.includes('Utility')) {
+        if (sourceType.includes('Other') || targetType.includes('Other')) {
+            return 'Processed Input, Error Messages';
+        }
+    }
+    
+    // Default data types based on common patterns
+    if (sourceType.includes('Service') || targetType.includes('Service')) {
+        return 'Business Logic, API Calls';
+    }
+    if (sourceType.includes('Model') || targetType.includes('Model')) {
+        return 'Entity Data, Schema Info';
+    }
+    if (sourceType.includes('Utility') || targetType.includes('Utility')) {
+        return 'Helper Functions, Validation';
+    }
+    
+    return 'Configuration, Metadata';
+}
+
 // Get node parent module
 function getNodeParentModule(node) {
     // First check if node has parent_module metadata
@@ -249,7 +382,7 @@ function displayGraph() {
     if (currentViewMode === 'HIERARCHY') {
         // Show hierarchical view based on depth
         if (currentDepth === 1) {
-            // Business level - show only HLD nodes
+            // Business level - show only HLD nodes with data flow connections
             const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
             hldNodes.forEach((node, index) => {
                 elements.push({
@@ -266,6 +399,33 @@ function displayGraph() {
                     }
                 });
             });
+            
+            // Add data flow connections between HLD modules
+            if (hldNodes.length > 1) {
+                for (let i = 0; i < hldNodes.length; i++) {
+                    for (let j = i + 1; j < hldNodes.length; j++) {
+                        const sourceNode = hldNodes[i];
+                        const targetNode = hldNodes[j];
+                        
+                        // Determine data types based on module types
+                        let dataTypes = getDataFlowTypes(sourceNode, targetNode);
+                        
+                        // Create bidirectional data flow edge
+                        elements.push({
+                            data: {
+                                id: `data-flow-${sourceNode.id}-${targetNode.id}`,
+                                source: sourceNode.id,
+                                target: targetNode.id,
+                                label: dataTypes,
+                                bidirectional: true,
+                                type: 'data_flow',
+                                sourceArrowColor: '#e74c3c',
+                                sourceArrowShape: 'triangle'
+                            }
+                        });
+                    }
+                }
+            }
         } else {
             // System/Implementation levels - show hierarchy
             const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
@@ -647,6 +807,15 @@ async function loadGraphData() {
         // Display graph with current settings
         displayGraph();
         
+        // Update statistics and health
+        updateStatistics(currentGraphData);
+        updateComponentHealth(currentGraphData);
+        
+        // Show dashboard sections
+        elements.teamProgressSection.style.display = 'block';
+        elements.dependenciesSection.style.display = 'block';
+        elements.activitySection.style.display = 'block';
+        
         addLog('Graph data loaded successfully', 'success');
     } catch (error) {
         addLog(`Failed to load graph data: ${error.message}`, 'error');
@@ -748,6 +917,103 @@ function updateAnalyzeButton() {
 
 function showExportSection() {
     elements.exportSection.style.display = 'block';
+}
+
+function updateStatistics(data) {
+    if (!data || !data.statistics) return;
+    
+    const stats = data.statistics;
+    elements.filesAnalyzed.textContent = stats.total_files || 0;
+    elements.coveragePercent.textContent = `${(stats.coverage_percentage || 0).toFixed(1)}%`;
+    elements.hldNodes.textContent = stats.hld_nodes || 0;
+    elements.lldNodes.textContent = stats.lld_nodes || 0;
+    elements.totalEdges.textContent = stats.total_edges || 0;
+    
+    elements.statsSection.style.display = 'block';
+}
+
+function updateComponentHealth(data) {
+    if (!data || !data.statistics) return;
+    
+    const stats = data.statistics;
+    
+    // Calculate health metrics based on analysis data
+    const codeQuality = calculateCodeQuality(stats);
+    const complexity = calculateComplexity(stats);
+    const dependencies = calculateDependencies(stats);
+    
+    elements.codeQuality.textContent = `${codeQuality.score}%`;
+    elements.complexity.textContent = complexity.label;
+    elements.dependencies.textContent = dependencies.label;
+    
+    // Update health indicators
+    updateHealthIndicator('codeQuality', codeQuality.status);
+    updateHealthIndicator('complexity', complexity.status);
+    updateHealthIndicator('dependencies', dependencies.status);
+    
+    elements.healthSection.style.display = 'block';
+}
+
+function calculateCodeQuality(stats) {
+    const coverage = stats.coverage_percentage || 0;
+    const validationIssues = stats.validation_issues || 0;
+    
+    let score = Math.min(100, coverage - (validationIssues * 5));
+    let status = 'healthy';
+    
+    if (score < 70) status = 'critical';
+    else if (score < 85) status = 'warning';
+    
+    return { score: Math.max(0, Math.round(score)), status };
+}
+
+function calculateComplexity(stats) {
+    const avgComplexity = stats.average_complexity || 1;
+    let status = 'healthy';
+    let label = 'Low';
+    
+    if (avgComplexity > 3) {
+        status = 'critical';
+        label = 'High';
+    } else if (avgComplexity > 2) {
+        status = 'warning';
+        label = 'Medium';
+    }
+    
+    return { status, label };
+}
+
+function calculateDependencies(stats) {
+    const totalEdges = stats.total_edges || 0;
+    const totalNodes = (stats.hld_nodes || 0) + (stats.lld_nodes || 0);
+    const avgDeps = totalNodes > 0 ? totalEdges / totalNodes : 0;
+    
+    let status = 'healthy';
+    let label = 'Balanced';
+    
+    if (avgDeps > 5) {
+        status = 'critical';
+        label = 'High';
+    } else if (avgDeps > 3) {
+        status = 'warning';
+        label = 'Medium';
+    }
+    
+    return { status, label };
+}
+
+function updateHealthIndicator(elementId, status) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    const indicator = element.parentElement.querySelector('.health-indicator');
+    if (!indicator) return;
+    
+    // Remove existing status classes
+    indicator.classList.remove('healthy', 'warning', 'critical');
+    
+    // Add new status class
+    indicator.classList.add(status);
 }
 
 function updateMetadata() {
