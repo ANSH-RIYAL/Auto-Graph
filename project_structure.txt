@@ -1,0 +1,226 @@
+# AutoGraph Project Structure
+
+## Directory Organization
+
+```
+vc-one/
+├── Software_Requirements.md     # Project requirements (NEVER DELETE)
+├── README.md                    # Project overview and setup
+├── CHANGELOG.md                 # Development progress tracking
+├── project_structure.txt        # This file - directory organization
+├── Project goals.txt            # Original project vision and goals
+├── requirements.txt             # Python dependencies
+├── setup.py                     # Package setup
+├── run_web.py                   # Main web application entry point
+├── test_integration.py          # Integration testing
+├── .env                         # Environment configuration
+├── src/                         # Main source code
+│   ├── __init__.py
+│   ├── main.py                  # CLI entry point (legacy, can be removed)
+│   ├── parser/                  # AST parsing and symbol extraction
+│   │   ├── __init__.py
+│   │   ├── file_parser.py       # Main file parsing logic
+│   │   └── ast_parser.py        # AST-based code analysis
+│   ├── analyzer/                # Codebase analysis and traversal
+│   │   ├── __init__.py
+│   │   └── codebase_analyzer.py # Main analysis engine
+│   ├── models/                  # Data models and schemas
+│   │   ├── __init__.py
+│   │   ├── graph_models.py      # Graph node/edge models
+│   │   └── schemas.py           # Pydantic schemas
+│   ├── llm_integration/         # LLM-powered semantic analysis
+│   │   ├── __init__.py
+│   │   ├── llm_client.py        # LLM API integration
+│   │   ├── relationship_mapper.py # Relationship mapping logic
+│   │   └── semantic_analyzer.py # LLM integration for code analysis
+│   ├── graph_builder/           # Graph construction and management
+│   │   ├── __init__.py
+│   │   └── enhanced_graph_builder.py # Enhanced graph construction
+│   ├── export/                  # Multi-format export functionality
+│   │   ├── __init__.py
+│   │   └── enhanced_exporter.py # Export to multiple formats
+│   ├── visualization/           # Graph visualization components
+│   │   ├── __init__.py
+│   │   └── graph_visualizer.py  # Graph visualization logic
+│   ├── config/                  # Configuration management
+│   │   ├── __init__.py
+│   │   └── settings.py          # Application settings
+│   ├── utils/                   # Utilities and helpers
+│   │   ├── __init__.py
+│   │   ├── file_utils.py        # File system utilities
+│   │   └── logger.py            # Logging configuration
+│   ├── agent_detection/         # NEW: Agent detection and analysis
+│   │   ├── __init__.py
+│   │   ├── agent_detector.py    # Detect AI agent usage patterns
+│   │   ├── risk_assessor.py     # Assess business risk of agent components
+│   │   └── context_extractor.py # Extract business context of agent usage
+│   ├── observability/           # NEW: Audit and compliance features
+│   │   ├── __init__.py
+│   │   ├── audit_mode.py        # Audit mode functionality
+│   │   ├── compliance_reporter.py # Generate compliance reports
+│   │   └── business_context.py  # Business context analysis
+│   ├── api/                     # API layer (future use)
+│   │   └── __init__.py
+│   └── web/                     # Web application components
+│       ├── flask_app.py         # Main Flask application
+│       ├── static/              # Static assets
+│       │   ├── css/
+│       │   │   └── style.css    # Main stylesheet
+│       │   └── js/
+│       │       └── app.js       # Frontend JavaScript
+│       └── templates/           # HTML templates
+│           └── index.html       # Main application template
+├── tests/                       # Test suite
+│   ├── __init__.py
+│   ├── test_parser.py           # Parser tests
+│   ├── test_analyzer.py         # Analyzer tests
+│   ├── test_semantic_analyzer.py # LLM integration tests
+│   ├── test_agent_detection.py  # NEW: Agent detection tests
+│   └── test_observability.py    # NEW: Observability tests
+├── graph/                       # Output directory for generated graphs
+│   └── .gitkeep
+├── logs/                        # Application logs
+│   └── .gitkeep
+├── cache/                       # LLM response caching
+│   └── .gitkeep
+└── examples/                    # Sample codebases for testing
+    └── sample_codebases/
+        ├── calculator_app/      # Sample Python calculator web app
+        │   ├── app.py
+        │   ├── calculator/
+        │   │   ├── __init__.py
+        │   │   ├── models/
+        │   │   ├── services/
+        │   │   └── utils/
+        │   ├── README.md
+        │   └── requirements.txt
+        └── ai_enhanced_app/     # NEW: Sample AI-enhanced app for testing
+            ├── app.py
+            ├── ai_services/
+            │   ├── __init__.py
+            │   ├── classifier.py # OpenAI integration example
+            │   └── analyzer.py   # LangChain integration example
+            ├── services/
+            │   ├── __init__.py
+            │   └── business_logic.py
+            ├── README.md
+            └── requirements.txt
+```
+
+## Naming Conventions
+
+### Files
+- Use snake_case for Python files
+- Use descriptive names that indicate purpose
+- Prefix test files with `test_`
+- Use version suffixes for experimental files (e.g., `parser_v2.py`)
+
+### Directories
+- Use snake_case for directory names
+- Keep names short but descriptive
+- Maintain consistent hierarchy
+
+### Classes
+- Use PascalCase for class names
+- Use descriptive names that indicate functionality
+
+### Functions and Variables
+- Use snake_case for functions and variables
+- Use descriptive names that indicate purpose
+
+## File Preservation Rules
+
+**NEVER DELETE OR MODIFY THESE FILES:**
+- `Software_Requirements.md`
+- `README.md`
+- `project_structure.txt`
+- `Project goals.txt`
+- Any existing working modules
+
+**ALWAYS:**
+- Create new files in appropriate directories
+- Use version suffixes for experimental files
+- Keep original files as backup
+- Document all changes in `CHANGELOG.md`
+
+## Current Architecture Decisions
+
+### Web Application Structure
+- **Primary Entry Point**: `run_web.py` (replaces CLI for web usage)
+- **Web Framework**: Flask (chosen for simplicity and integration)
+- **Frontend**: HTML/CSS/JavaScript (no separate React/frontend build)
+- **Static Assets**: Served directly from `src/web/static/`
+- **Templates**: Jinja2 templates in `src/web/templates/`
+
+### Module Organization
+- **Parser**: Handles file parsing and AST analysis
+- **Analyzer**: Coordinates the entire analysis pipeline
+- **LLM Integration**: Manages semantic analysis and caching
+- **Graph Builder**: Constructs hierarchical graphs
+- **Export**: Handles multi-format output
+- **Visualization**: Prepares data for visual representation
+- **Web**: Flask application and frontend assets
+- **Agent Detection**: NEW: Identifies AI agent usage patterns
+- **Observability**: NEW: Provides audit and compliance features
+
+### Data Flow
+1. **Input**: File upload or GitHub URL
+2. **Parsing**: Extract symbols and structure
+3. **LLM Analysis**: Semantic classification and relationship mapping
+4. **Agent Detection**: NEW: Identify AI agent usage and assess risk
+5. **Graph Construction**: Build HLD/LLD hierarchical graph with agent metadata
+6. **Export**: Generate multiple output formats including audit reports
+7. **Visualization**: Display in web interface with audit mode toggle
+
+## Recent Changes (July 2024)
+
+### Files Removed
+- `client/` - React/Vite frontend (redundant with Flask approach)
+- `AutoGraphGenerator/` - Old frontend implementation
+- `env_template.txt` - Duplicate configuration
+- `LLM_INTEGRATION.md` - Documentation consolidated
+- `PROGRESS_SUMMARY.md` - Information moved to other docs
+
+### Files Added
+- `run_web.py` - New web application entry point
+- `test_integration.py` - Integration testing
+- `src/web/` - Complete web application structure
+- `src/config/settings.py` - Configuration management
+- `src/agent_detection/` - NEW: Agent detection and analysis modules
+- `src/observability/` - NEW: Audit and compliance features
+- `examples/ai_enhanced_app/` - NEW: Sample AI-enhanced codebase for testing
+
+### Architecture Improvements
+- **Unified Web Interface**: Single Flask application serving both API and frontend
+- **Improved Node Layout**: Grid-based positioning for better visualization
+- **LLM Caching**: Intelligent caching to reduce API costs
+- **Clean Repository**: Removed redundant files and dependencies
+- **Agent-Aware Analysis**: NEW: Detection and risk assessment of AI components
+- **Audit Mode**: NEW: Compliance and business context analysis
+
+## Upcoming Structure Changes (Phase 5-6)
+
+### Planned Additions
+- **Agent Detection Engine**: Reliable detection of AI agent usage patterns
+- **Risk Assessment Module**: Business risk analysis of agent components
+- **Audit Mode Interface**: Filtered view for agent-touched components
+- **Compliance Reporting**: Enterprise-ready audit documentation
+- **Business Context Analysis**: LLM-powered business impact assessment
+
+### Potential New Modules
+- `src/agent_detection/` - Agent detection and analysis (IMPLEMENTING)
+- `src/observability/` - Audit and compliance features (IMPLEMENTING)
+- `src/graph_layout/` - Graph positioning and layout algorithms (Future)
+- `src/interaction/` - User interaction and navigation logic (Future)
+- `src/mobile/` - Mobile-specific interface components (Future)
+- `src/accessibility/` - Accessibility features and compliance (Future)
+
+### Data Structure Enhancements
+- **Agent Metadata**: Enhanced node information for AI agent usage
+- **Risk Assessment**: Business risk levels and impact analysis
+- **Compliance Data**: Audit trail and compliance documentation
+- **Business Context**: Business purpose and impact of agent decisions
+- **Connection Metadata**: Enhanced edge information for HLD-LLD relationships
+- **Interaction State**: User interaction and navigation state management
+- **Visual Preferences**: User-configurable display options
+- **Export Templates**: Customizable export formats and templates 
