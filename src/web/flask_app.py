@@ -42,59 +42,115 @@ analysis_results = {}
 analysis_sessions = {}
 
 def convert_analysis_result_to_frontend_format(analysis_result):
-    """Convert our backend analysis result to the frontend format"""
+    """Convert our backend analysis result to the frontend format with enhanced metadata"""
     if not analysis_result or 'graph' not in analysis_result or not analysis_result['graph']:
         return None
     
     graph = analysis_result['graph']
     
-    # Convert nodes to frontend format
+    # Convert nodes to frontend format with enhanced metadata
     nodes = []
-    for node in graph.nodes:  # Graph object has .nodes attribute, not .get('nodes')
+    for node in graph.nodes:
+        # Get enhanced metadata
+        node_metadata = node.metadata if node.metadata else {}
+        
         frontend_node = {
             "id": node.id,
             "name": node.name,
             "type": node.type.value if hasattr(node.type, 'value') else str(node.type),
             "level": node.level.value if hasattr(node.level, 'value') else str(node.level),
-            "files": node.files,  # Fixed: was file_paths, should be files
-            "parent": node.parent,  # Fixed: was parent_id, should be parent
-            "children": node.children,  # Fixed: was calculating from edges, should use children directly
+            "files": node.files,
+            "parent": node.parent,
+            "children": node.children,
+            "functions": node.functions,
+            "classes": node.classes,
+            "imports": node.imports,
             "metadata": {
-                "purpose": node.metadata.purpose if node.metadata else '',
-                "complexity": node.metadata.complexity.value if node.metadata and hasattr(node.metadata.complexity, 'value') else str(node.metadata.complexity) if node.metadata else 'low',
-                "dependencies": node.metadata.dependencies if node.metadata else [],
-                "line_count": node.metadata.line_count if node.metadata else 0,
-                "file_size": node.metadata.file_size if node.metadata else 0,
-                "language": node.metadata.language if node.metadata else 'unknown',
-                "category": node.metadata.category if node.metadata else 'other'
+                "purpose": node_metadata.purpose if node_metadata else '',
+                "complexity": node_metadata.complexity.value if node_metadata and hasattr(node_metadata.complexity, 'value') else str(node_metadata.complexity) if node_metadata else 'low',
+                "dependencies": node_metadata.dependencies if node_metadata else [],
+                "line_count": node_metadata.line_count if node_metadata else 0,
+                "file_size": node_metadata.file_size if node_metadata else 0,
+                "language": node_metadata.language if node_metadata else 'unknown',
+                "category": node_metadata.category if node_metadata else 'other',
+                # Enhanced metadata
+                "technical_depth": node_metadata.technical_depth if node_metadata else (1 if node.level.value == 'HLD' else 3),
+                "color": node_metadata.color if node_metadata else None,
+                "size": node_metadata.size if node_metadata else None,
+                "agent_touched": node_metadata.agent_touched if node_metadata else False,
+                "agent_types": node_metadata.agent_types if node_metadata else [],
+                "risk_level": node_metadata.risk_level.value if node_metadata and hasattr(node_metadata.risk_level, 'value') else str(node_metadata.risk_level) if node_metadata else 'low',
+                "business_impact": node_metadata.business_impact if node_metadata else None,
+                "agent_context": node_metadata.agent_context if node_metadata else None
             },
+            "pm_metadata": {
+                "business_value": node.pm_metadata.business_value if node.pm_metadata else None,
+                "development_status": node.pm_metadata.development_status if node.pm_metadata else "Active",
+                "completion_percentage": node.pm_metadata.completion_percentage if node.pm_metadata else 0.0,
+                "team_size": node.pm_metadata.team_size if node.pm_metadata else None,
+                "estimated_completion": node.pm_metadata.estimated_completion if node.pm_metadata else None,
+                "risk_factors": node.pm_metadata.risk_factors if node.pm_metadata else [],
+                "stakeholder_priority": node.pm_metadata.stakeholder_priority if node.pm_metadata else "medium"
+            } if node.pm_metadata else None,
+            "enhanced_metadata": {
+                "total_symbols": node.enhanced_metadata.total_symbols if node.enhanced_metadata else 0,
+                "has_parent": node.enhanced_metadata.has_parent if node.enhanced_metadata else False,
+                "has_children": node.enhanced_metadata.has_children if node.enhanced_metadata else False,
+                "child_count": node.enhanced_metadata.child_count if node.enhanced_metadata else 0,
+                "file_diversity": node.enhanced_metadata.file_diversity if node.enhanced_metadata else 0,
+                "complexity_score": node.enhanced_metadata.complexity_score if node.enhanced_metadata else 1
+            } if node.enhanced_metadata else None,
             "position": {"x": 0, "y": 0}  # Will be calculated by frontend
         }
         nodes.append(frontend_node)
     
     # Convert edges to frontend format
     edges = []
-    for edge in graph.edges:  # Graph object has .edges attribute, not .get('edges')
+    for edge in graph.edges:
         frontend_edge = {
-            "id": f"{edge.from_node}_{edge.to_node}",  # Create ID from source and target
-            "source": edge.from_node,  # Fixed: was source_id, should be from_node
-            "target": edge.to_node,  # Fixed: was target_id, should be to_node
+            "id": f"{edge.from_node}_{edge.to_node}",
+            "from_node": edge.from_node,  # Use from_node for consistency
+            "to_node": edge.to_node,      # Use to_node for consistency
             "type": edge.type.value if hasattr(edge.type, 'value') else str(edge.type),
             "metadata": {
-                "relationship_type": edge.metadata.get('relationship_type', 'dependency') if edge.metadata else 'dependency'
+                "relationship_type": edge.metadata.get('relationship_type', 'dependency') if edge.metadata else 'dependency',
+                "communication_type": edge.metadata.get('communication_type', '') if edge.metadata else '',
+                "bidirectional": edge.metadata.get('bidirectional', False) if edge.metadata else False
             }
         }
         edges.append(frontend_edge)
     
-    # Create metadata
+    # Create enhanced metadata with statistics and PM metrics
+    graph_metadata = graph.metadata if graph.metadata else {}
+    
     metadata = {
         "codebase_path": analysis_result.get('codebase_path', ''),
         "analysis_timestamp": analysis_result.get('timestamp', datetime.now().isoformat()),
-        "file_count": analysis_result.get('statistics', {}).get('total_files', 0),
-        "coverage_percentage": analysis_result.get('statistics', {}).get('coverage_percentage', 0),
-        "total_lines": analysis_result.get('statistics', {}).get('total_lines', 0),
-        "languages": analysis_result.get('statistics', {}).get('languages', []),
-        "categories": analysis_result.get('statistics', {}).get('categories', {})
+        "file_count": graph_metadata.file_count if graph_metadata else 0,
+        "coverage_percentage": graph_metadata.coverage_percentage if graph_metadata else 0,
+        "total_lines": graph_metadata.total_lines if graph_metadata else 0,
+        "languages": graph_metadata.languages if graph_metadata else [],
+        "categories": graph_metadata.categories if graph_metadata else {},
+        # Enhanced statistics
+        "statistics": {
+            "total_nodes": graph_metadata.statistics.total_nodes if graph_metadata and graph_metadata.statistics else len(nodes),
+            "hld_nodes": graph_metadata.statistics.hld_nodes if graph_metadata and graph_metadata.statistics else len([n for n in nodes if n['level'] == 'HLD']),
+            "lld_nodes": graph_metadata.statistics.lld_nodes if graph_metadata and graph_metadata.statistics else len([n for n in nodes if n['level'] == 'LLD']),
+            "total_edges": graph_metadata.statistics.total_edges if graph_metadata and graph_metadata.statistics else len(edges),
+            "technical_depths": graph_metadata.statistics.technical_depths if graph_metadata and graph_metadata.statistics else {
+                "business": len([n for n in nodes if n['metadata']['technical_depth'] == 1]),
+                "system": len([n for n in nodes if n['metadata']['technical_depth'] == 2]),
+                "implementation": len([n for n in nodes if n['metadata']['technical_depth'] == 3])
+            }
+        },
+        # PM metrics
+        "pm_metrics": {
+            "development_velocity": graph_metadata.pm_metrics.development_velocity if graph_metadata and graph_metadata.pm_metrics else "medium",
+            "risk_level": graph_metadata.pm_metrics.risk_level.value if graph_metadata and graph_metadata.pm_metrics and hasattr(graph_metadata.pm_metrics.risk_level, 'value') else str(graph_metadata.pm_metrics.risk_level) if graph_metadata and graph_metadata.pm_metrics else "low",
+            "completion_percentage": graph_metadata.pm_metrics.completion_percentage if graph_metadata and graph_metadata.pm_metrics else 85.0,
+            "blocked_components": graph_metadata.pm_metrics.blocked_components if graph_metadata and graph_metadata.pm_metrics else 0,
+            "active_dependencies": graph_metadata.pm_metrics.active_dependencies if graph_metadata and graph_metadata.pm_metrics else len(edges)
+        } if graph_metadata and graph_metadata.pm_metrics else None
     }
     
     return {
@@ -106,11 +162,6 @@ def convert_analysis_result_to_frontend_format(analysis_result):
 @app.route('/')
 def index():
     return render_template('index.html')
-
-@app.route('/graph-view')
-def graph_view():
-    """Render the enhanced graph visualization view"""
-    return render_template('graph_view.html')
 
 @app.route('/api/analysis/upload', methods=['POST'])
 def upload_analysis():

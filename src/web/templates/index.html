@@ -6,6 +6,7 @@
     <title>AutoGraph - Codebase Graph Generator</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/cytoscape@3.21.1/dist/cytoscape.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -22,9 +23,20 @@
                     </div>
                 </div>
                 <div class="header-right">
-                    <div class="view-toggle">
-                        <button class="view-btn active" data-view="HLD">HLD</button>
-                        <button class="view-btn" data-view="LLD">LLD</button>
+                    <div class="depth-controls">
+                        <div class="depth-label">Technical Depth:</div>
+                        <div class="slider-container">
+                            <input type="range" id="depthSlider" min="1" max="3" value="1" class="depth-slider">
+                            <div class="slider-labels">
+                                <span>Business</span>
+                                <span>System</span>
+                                <span>Implementation</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="view-controls">
+                        <button class="mode-btn active" onclick="setViewMode('HIERARCHY')" id="hierarchyBtn">Hierarchy View</button>
+                        <button class="mode-btn" onclick="setViewMode('CONNECTIONS')" id="connectionsBtn">All Connections</button>
                     </div>
                     <button class="help-btn">
                         <i class="fas fa-question-circle"></i>
@@ -103,6 +115,14 @@
                     </div>
                 </div>
 
+                <!-- Project Dashboard -->
+                <div class="sidebar-section" id="pmInfo" style="display: none;">
+                    <h2>Project Dashboard</h2>
+                    <div class="pm-info-content" id="pmStats">
+                        <!-- PM metrics will be populated here -->
+                    </div>
+                </div>
+
                 <!-- Metadata Panel -->
                 <div class="sidebar-section" id="metadataSection" style="display: none;">
                     <h2>Codebase Metadata</h2>
@@ -127,32 +147,29 @@
             <div class="graph-area">
                 <div class="graph-toolbar">
                     <div class="toolbar-left">
-                        <h2 id="graphTitle">High-Level Design Graph</h2>
+                        <h2 id="graphTitle">Enhanced Graph Visualization</h2>
                         <div class="graph-stats">
                             <span id="nodeCount">0 nodes</span>
                             <span>•</span>
                             <span id="edgeCount">0 connections</span>
+                            <span>•</span>
+                            <span id="depthLabel">Business View</span>
                         </div>
                     </div>
-                                    <div class="toolbar-right">
-                    <button class="toolbar-btn" id="enhancedViewBtn" title="Enhanced Visualization">
-                        <i class="fas fa-chart-network"></i>
-                        Enhanced View
-                    </button>
-                    <button class="toolbar-btn" id="zoomOutBtn">
-                        <i class="fas fa-search-minus"></i>
-                    </button>
-                    <button class="toolbar-btn" id="zoomInBtn">
-                        <i class="fas fa-search-plus"></i>
-                    </button>
-                    <button class="toolbar-btn" id="fitViewBtn">
-                        <i class="fas fa-expand"></i>
-                    </button>
-                    <button class="toolbar-btn" id="exportBtn">
-                        <i class="fas fa-download"></i>
-                        Export
-                    </button>
-                </div>
+                    <div class="toolbar-right">
+                        <button class="toolbar-btn" id="fitViewBtn">
+                            <i class="fas fa-expand"></i>
+                            Fit All
+                        </button>
+                        <button class="toolbar-btn" id="centerBtn">
+                            <i class="fas fa-crosshairs"></i>
+                            Center
+                        </button>
+                        <button class="toolbar-btn" id="exportBtn">
+                            <i class="fas fa-download"></i>
+                            Export
+                        </button>
+                    </div>
                 </div>
 
                 <div class="graph-container" id="graphContainer">
@@ -161,8 +178,9 @@
                             <i class="fas fa-project-diagram"></i>
                         </div>
                         <h3>No Graph Data</h3>
-                        <p>Upload a codebase or provide a GitHub URL to generate the graph visualization</p>
+                        <p>Upload a codebase or provide a GitHub URL to generate the enhanced graph visualization</p>
                     </div>
+                    <div id="cy" style="width: 100%; height: 100%; display: none;"></div>
                 </div>
             </div>
 

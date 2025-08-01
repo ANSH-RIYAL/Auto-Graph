@@ -1,9 +1,21 @@
 // Global state
 let currentAnalysisId = null;
 let currentGraphData = null;
-let currentViewMode = 'HLD';
+let currentDepth = 1;
+let currentViewMode = 'HIERARCHY';
 let selectedNode = null;
 let isProcessing = false;
+let cy = null;
+
+// Color mapping for HLD modules
+const moduleColors = {
+    'module_service_layer': '#9013FE',
+    'module_utilities': '#D0021B', 
+    'module_other': '#4A90E2',
+    'frontend_module': '#4CAF50',
+    'backend_module': '#2196F3',
+    'database_module': '#FF9800'
+};
 
 // DOM elements
 const elements = {
@@ -31,6 +43,10 @@ const elements = {
     exportSection: document.getElementById('exportSection'),
     exportBtns: document.querySelectorAll('.export-btn'),
     
+    // PM Info
+    pmInfo: document.getElementById('pmInfo'),
+    pmStats: document.getElementById('pmStats'),
+    
     // Metadata
     metadataSection: document.getElementById('metadataSection'),
     metadataContent: document.getElementById('metadataContent'),
@@ -42,11 +58,13 @@ const elements = {
     graphTitle: document.getElementById('graphTitle'),
     nodeCount: document.getElementById('nodeCount'),
     edgeCount: document.getElementById('edgeCount'),
+    depthLabel: document.getElementById('depthLabel'),
     graphContainer: document.getElementById('graphContainer'),
     emptyState: document.getElementById('emptyState'),
+    cy: document.getElementById('cy'),
     
-    // View toggle
-    viewBtns: document.querySelectorAll('.view-btn'),
+    // Depth controls
+    depthSlider: document.getElementById('depthSlider'),
     
     // Node details
     nodeDetails: document.getElementById('nodeDetails'),
@@ -55,18 +73,89 @@ const elements = {
     closeNodeDetails: document.getElementById('closeNodeDetails'),
     
     // Toolbar buttons
-    enhancedViewBtn: document.getElementById('enhancedViewBtn'),
-    zoomOutBtn: document.getElementById('zoomOutBtn'),
-    zoomInBtn: document.getElementById('zoomInBtn'),
     fitViewBtn: document.getElementById('fitViewBtn'),
+    centerBtn: document.getElementById('centerBtn'),
     exportBtn: document.getElementById('exportBtn')
 };
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     initializeEventListeners();
+    initializeCytoscape();
     addLog('Ready to analyze', 'info');
 });
+
+// Initialize Cytoscape
+function initializeCytoscape() {
+    cy = cytoscape({
+        container: elements.cy,
+        elements: [],
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'content': 'data(label)',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'background-color': 'data(color)',
+                    'color': '#000000',
+                    'border-width': 2,
+                    'border-color': '#333333',
+                    'shape': 'roundrectangle',
+                    'width': 120,
+                    'height': 60,
+                    'font-size': '11px',
+                    'text-wrap': 'wrap',
+                    'text-max-width': '100px'
+                }
+            },
+            {
+                selector: 'node[level = "HLD"]',
+                style: {
+                    'border-width': 4,
+                    'border-color': '#000000',
+                    'width': 150,
+                    'height': 80,
+                    'font-size': '13px',
+                    'font-weight': 'bold'
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 3,
+                    'line-color': '#666666',
+                    'target-arrow-color': '#666666',
+                    'target-arrow-shape': 'triangle',
+                    'source-arrow-color': 'data(sourceArrowColor)',
+                    'source-arrow-shape': 'data(sourceArrowShape)',
+                    'curve-style': 'bezier',
+                    'content': 'data(label)',
+                    'font-size': '10px',
+                    'text-rotation': 'autorotate',
+                    'text-margin-y': -12,
+                    'text-background-color': 'white',
+                    'text-background-opacity': 0.8,
+                    'text-background-padding': 2
+                }
+            },
+            {
+                selector: 'edge[bidirectional = "true"]',
+                style: {
+                    'source-arrow-shape': 'triangle',
+                    'source-arrow-color': '#666666'
+                }
+            }
+        ],
+        layout: { name: 'preset' }
+    });
+
+    // Add event listeners for Cytoscape
+    cy.on('tap', 'node', function(evt) {
+        const node = evt.target;
+        selectNode(node.data());
+    });
+}
 
 // Initialize event listeners
 function initializeEventListeners() {
@@ -85,9 +174,13 @@ function initializeEventListeners() {
     // Analyze button
     elements.analyzeBtn.addEventListener('click', handleAnalyze);
     
-    // View toggle
-    elements.viewBtns.forEach(btn => {
-        btn.addEventListener('click', () => switchView(btn.dataset.view));
+    // Depth slider
+    elements.depthSlider.addEventListener('input', function() {
+        currentDepth = parseInt(this.value);
+        updateDepthLabel();
+        if (currentGraphData) {
+            displayGraph();
+        }
     });
     
     // Export buttons
@@ -99,28 +192,286 @@ function initializeEventListeners() {
     elements.closeNodeDetails.addEventListener('click', closeNodeDetails);
     
     // Toolbar buttons
-    elements.enhancedViewBtn.addEventListener('click', openEnhancedView);
-    elements.zoomOutBtn.addEventListener('click', () => zoomGraph(-0.1));
-    elements.zoomInBtn.addEventListener('click', () => zoomGraph(0.1));
-    elements.fitViewBtn.addEventListener('click', fitView);
+    elements.fitViewBtn.addEventListener('click', () => cy.fit());
+    elements.centerBtn.addEventListener('click', () => cy.center());
     elements.exportBtn.addEventListener('click', () => handleExport('json'));
+}
+
+// Set view mode
+function setViewMode(mode) {
+    currentViewMode = mode;
+    document.getElementById('hierarchyBtn').classList.toggle('active', mode === 'HIERARCHY');
+    document.getElementById('connectionsBtn').classList.toggle('active', mode === 'CONNECTIONS');
     
-    // Graph container click to deselect
-    elements.graphContainer.addEventListener('click', (e) => {
-        if (e.target === elements.graphContainer) {
-            closeNodeDetails();
-        }
+    if (currentGraphData) {
+        displayGraph();
+    }
+}
+
+// Update depth label
+function updateDepthLabel() {
+    const labels = ['Business View', 'System View', 'Implementation View'];
+    elements.depthLabel.textContent = labels[currentDepth - 1];
+}
+
+// Get node parent module
+function getNodeParentModule(node) {
+    // First check if node has parent_module metadata
+    if (node.metadata && node.metadata.parent_module) {
+        return node.metadata.parent_module;
+    }
+    
+    // Fallback: Map LLD nodes to their parent HLD module based on naming patterns
+    const nodeId = node.id;
+    if (nodeId.includes('frontend') || nodeId.includes('catalog') || nodeId.includes('cart') || nodeId.includes('auth')) return 'frontend_module';
+    if (nodeId.includes('service') || nodeId.includes('order') || nodeId.includes('payment') || nodeId.includes('inventory')) return 'backend_module';
+    if (nodeId.includes('database') || nodeId.includes('_db')) return 'database_module';
+    
+    // Original fallback logic
+    if (nodeId.includes('_app') || nodeId.includes('Other')) return 'module_other';
+    if (nodeId.includes('Service') || nodeId.includes('History') || nodeId.includes('Calculator')) return 'module_service_layer';
+    if (nodeId.includes('Validation') || nodeId.includes('Data Processing')) return 'module_utilities';
+    return 'module_other'; // default
+}
+
+// Display graph with enhanced visualization
+function displayGraph() {
+    if (!currentGraphData) return;
+    
+    const elements = [];
+    
+    // Filter nodes by technical depth
+    const filteredNodes = currentGraphData.nodes.filter(node => {
+        const nodeDepth = node.metadata?.technical_depth || (node.level === 'HLD' ? 1 : 3);
+        return nodeDepth <= currentDepth;
     });
+    
+    if (currentViewMode === 'HIERARCHY') {
+        // Show hierarchical view based on depth
+        if (currentDepth === 1) {
+            // Business level - show only HLD nodes
+            const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
+            hldNodes.forEach((node, index) => {
+                elements.push({
+                    data: {
+                        id: node.id,
+                        label: node.name || node.id,
+                        type: node.type,
+                        level: node.level,
+                        color: node.metadata?.color || moduleColors[node.id] || '#f0f0f0'
+                    },
+                    position: {
+                        x: 200 + (index * 350),
+                        y: 200
+                    }
+                });
+            });
+        } else {
+            // System/Implementation levels - show hierarchy
+            const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
+            const lldNodes = filteredNodes.filter(node => node.level === 'LLD');
+        
+            // Add HLD nodes at top level
+            hldNodes.forEach((node, index) => {
+                elements.push({
+                    data: {
+                        id: node.id,
+                        label: node.name || node.id,
+                        type: node.type,
+                        level: node.level,
+                        color: node.metadata?.color || moduleColors[node.id] || '#f0f0f0'
+                    },
+                    position: {
+                        x: 200 + (index * 400),
+                        y: 100
+                    }
+                });
+            });
+        
+            // Group LLD nodes by parent module and position them below
+            const moduleGroups = {};
+            
+            lldNodes.forEach(node => {
+                const parentModule = getNodeParentModule(node);
+                const parentColor = node.metadata?.color || moduleColors[parentModule] || '#f0f0f0';
+                
+                if (!moduleGroups[parentModule]) {
+                    moduleGroups[parentModule] = [];
+                }
+                
+                moduleGroups[parentModule].push({
+                    data: {
+                        id: node.id,
+                        label: node.name || node.id,
+                        type: node.type,
+                        level: node.level,
+                        color: parentColor,
+                        parent: parentModule
+                    }
+                });
+            });
+            
+            // Position LLD nodes in columns under their parent modules
+            Object.keys(moduleGroups).forEach((moduleId, moduleIndex) => {
+                const group = moduleGroups[moduleId];
+                group.forEach((node, nodeIndex) => {
+                    node.position = {
+                        x: 150 + (moduleIndex * 400) + ((nodeIndex % 2) * 100),
+                        y: 250 + (Math.floor(nodeIndex / 2) * 120)
+                    };
+                    elements.push(node);
+                });
+            });
+            
+            // Add hierarchy edges from HLD to LLD (only at depth 2+)
+            if (currentDepth >= 2) {
+                lldNodes.forEach(lldNode => {
+                    const parentModule = getNodeParentModule(lldNode);
+                    elements.push({
+                        data: {
+                            id: `hierarchy-${parentModule}-${lldNode.id}`,
+                            source: parentModule,
+                            target: lldNode.id
+                        }
+                    });
+                });
+            }
+        }
+    } else if (currentViewMode === 'CONNECTIONS') {
+        // Show all filtered nodes with full connection view
+        filteredNodes.forEach(node => {
+            const parentModule = getNodeParentModule(node);
+            const nodeColor = node.metadata?.color || moduleColors[node.id] || moduleColors[parentModule] || '#f0f0f0';
+            
+            elements.push({
+                data: {
+                    id: node.id,
+                    label: node.name || node.id,
+                    type: node.type,
+                    level: node.level,
+                    color: nodeColor
+                }
+            });
+        });
+        
+        // Add edges with bidirectional arrows and communication labels
+        const addedEdges = new Set();
+        const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
+        
+        currentGraphData.edges.forEach(edge => {
+            // Only show edges between filtered nodes
+            if (!filteredNodeIds.has(edge.from_node) || !filteredNodeIds.has(edge.to_node)) {
+                return;
+            }
+            
+            const edgeKey = `${edge.from_node}-${edge.to_node}`;
+            const reverseKey = `${edge.to_node}-${edge.from_node}`;
+            
+            if (!addedEdges.has(edgeKey) && !addedEdges.has(reverseKey)) {
+                const isBidirectional = edge.metadata?.bidirectional === true;
+                const commType = edge.metadata?.communication_type || edge.metadata?.relationship_type || edge.type || '';
+                
+                elements.push({
+                    data: {
+                        id: edge.id || edgeKey,
+                        source: edge.from_node,
+                        target: edge.to_node,
+                        label: commType,
+                        bidirectional: isBidirectional,
+                        sourceArrowColor: isBidirectional ? '#666666' : 'transparent',
+                        sourceArrowShape: isBidirectional ? 'triangle' : 'none'
+                    }
+                });
+                addedEdges.add(edgeKey);
+            }
+        });
+    }
+    
+    // Update graph
+    cy.elements().remove();
+    cy.add(elements);
+    
+    // Choose layout based on view mode
+    if (currentViewMode === 'HIERARCHY') {
+        // Use preset layout since we're setting positions manually
+        cy.layout({
+            name: 'preset',
+            padding: 50
+        }).run();
+    } else {
+        // Use force-directed layout for connections view
+        cy.layout({
+            name: 'cose',
+            idealEdgeLength: 120,
+            nodeOverlap: 30,
+            refresh: 20,
+            fit: true,
+            padding: 50,
+            randomize: false,
+            componentSpacing: 150,
+            nodeRepulsion: 400000,
+            edgeElasticity: 100,
+            nestingFactor: 5,
+            gravity: 80,
+            numIter: 1000
+        }).run();
+    }
+    
+    setTimeout(() => cy.fit(), 300);
+    
+    // Update statistics
+    updateGraphStats();
+    updatePMDashboard();
+}
+
+// Update graph statistics
+function updateGraphStats() {
+    if (!currentGraphData) return;
+    
+    const filteredNodes = currentGraphData.nodes.filter(node => {
+        const nodeDepth = node.metadata?.technical_depth || (node.level === 'HLD' ? 1 : 3);
+        return nodeDepth <= currentDepth;
+    });
+    
+    elements.nodeCount.textContent = `${filteredNodes.length} nodes`;
+    elements.edgeCount.textContent = `${currentGraphData.edges.length} connections`;
+}
+
+// Update PM dashboard
+function updatePMDashboard() {
+    if (!currentGraphData || !currentGraphData.metadata) return;
+    
+    if (currentGraphData.metadata.pm_metrics) {
+        const metrics = currentGraphData.metadata.pm_metrics;
+        const stats = currentGraphData.metadata.statistics;
+        
+        elements.pmStats.innerHTML = `
+            <div>Completion: ${metrics.completion_percentage || 0}%</div>
+            <div>Risk Level: ${metrics.risk_level || 'Unknown'}</div>
+            <div>Active Dependencies: ${metrics.active_dependencies || 0}</div>
+            <div>Total Components: ${stats.total_nodes || 0}</div>
+            <div>Depth Level: ${getCurrentDepthLabel()}</div>
+        `;
+        elements.pmInfo.style.display = 'block';
+    }
+}
+
+// Get current depth label
+function getCurrentDepthLabel() {
+    switch(currentDepth) {
+        case 1: return 'Business View';
+        case 2: return 'System View';
+        case 3: return 'Implementation View';
+        default: return 'Unknown';
+    }
 }
 
 // Tab switching
 function switchTab(tabName) {
-    // Update tab buttons
     elements.tabBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
     
-    // Update tab content
     elements.tabContents.forEach(content => {
         content.classList.toggle('active', content.id === `${tabName}-tab`);
     });
@@ -140,66 +491,77 @@ function handleDragLeave(e) {
 function handleDrop(e) {
     e.preventDefault();
     elements.fileDropZone.classList.remove('drag-over');
-    handleFileSelect({ target: { files: e.dataTransfer.files } });
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFile(files[0]);
+    }
 }
 
 function handleFileSelect(e) {
     const files = e.target.files;
     if (files.length > 0) {
-        addLog(`Selected file: ${files[0].name}`, 'info');
+        handleFile(files[0]);
+    }
+}
+
+function handleFile(file) {
+    if (file.type === 'application/zip' || file.name.endsWith('.zip')) {
+        uploadFile(file);
+    } else {
+        addLog('Please select a ZIP file', 'error');
     }
 }
 
 // Analysis handling
 async function handleAnalyze() {
-    if (isProcessing) return;
-    
     const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
     
     if (activeTab === 'upload') {
         const files = elements.fileInput.files;
         if (files.length === 0) {
-            alert('Please select a file to upload');
+            addLog('Please select a file to analyze', 'error');
             return;
         }
         await uploadFile(files[0]);
     } else if (activeTab === 'github') {
         const url = elements.githubUrl.value.trim();
+        const branch = elements.githubBranch.value.trim() || 'main';
+        
         if (!url) {
-            alert('Please enter a GitHub URL');
+            addLog('Please enter a GitHub repository URL', 'error');
             return;
         }
-        const branch = elements.githubBranch.value.trim() || 'main';
         await analyzeGithub(url, branch);
     }
 }
 
 async function uploadFile(file) {
+    if (isProcessing) return;
+    
     isProcessing = true;
     updateAnalyzeButton();
     showStatus('Uploading file...');
-    addLog(`Uploading file: ${file.name}`, 'info');
+    
+    const formData = new FormData();
+    formData.append('file', file);
     
     try {
-        const formData = new FormData();
-        formData.append('file', file);
-        
         const response = await fetch('/api/analysis/upload', {
             method: 'POST',
             body: formData
         });
         
-        const data = await response.json();
+        const result = await response.json();
         
-        if (data.success) {
-            currentAnalysisId = data.analysisId;
-            addLog('File uploaded successfully', 'info');
-            await pollAnalysisStatus();
+        if (result.success) {
+            currentAnalysisId = result.analysisId;
+            addLog('File uploaded successfully, starting analysis...', 'success');
+            pollAnalysisStatus();
         } else {
-            throw new Error(data.error || 'Upload failed');
+            throw new Error(result.error || 'Upload failed');
         }
     } catch (error) {
-        console.error('Upload error:', error);
         addLog(`Upload failed: ${error.message}`, 'error');
         hideStatus();
     } finally {
@@ -209,10 +571,11 @@ async function uploadFile(file) {
 }
 
 async function analyzeGithub(url, branch) {
+    if (isProcessing) return;
+    
     isProcessing = true;
     updateAnalyzeButton();
     showStatus('Analyzing GitHub repository...');
-    addLog(`Analyzing GitHub repository: ${url} (branch: ${branch})`, 'info');
     
     try {
         const response = await fetch('/api/analysis/github', {
@@ -223,17 +586,16 @@ async function analyzeGithub(url, branch) {
             body: JSON.stringify({ url, branch })
         });
         
-        const data = await response.json();
+        const result = await response.json();
         
-        if (data.success) {
-            currentAnalysisId = data.analysisId;
-            addLog('GitHub analysis started', 'info');
-            await pollAnalysisStatus();
+        if (result.success) {
+            currentAnalysisId = result.analysisId;
+            addLog('GitHub analysis started...', 'success');
+            pollAnalysisStatus();
         } else {
-            throw new Error(data.error || 'GitHub analysis failed');
+            throw new Error(result.error || 'GitHub analysis failed');
         }
     } catch (error) {
-        console.error('GitHub analysis error:', error);
         addLog(`GitHub analysis failed: ${error.message}`, 'error');
         hideStatus();
     } finally {
@@ -247,284 +609,114 @@ async function pollAnalysisStatus() {
     
     try {
         const response = await fetch(`/api/analysis/${currentAnalysisId}/status`);
-        const status = await response.json();
+        const result = await response.json();
         
-        updateProgress(status.progress);
-        updateStatusMessage(status.message);
+        updateProgress(result.progress);
+        updateStatusMessage(result.message);
         
-        if (status.status === 'completed') {
-            addLog('Analysis completed successfully', 'info');
+        if (result.status === 'completed') {
+            addLog('Analysis completed successfully!', 'success');
+            hideStatus();
             await loadGraphData();
-            await loadAnalysisResponse();
+            showExportSection();
+            updateMetadata();
+        } else if (result.status === 'failed') {
+            addLog(`Analysis failed: ${result.message}`, 'error');
             hideStatus();
         } else {
-            // Poll again in 1 second
+            // Continue polling
             setTimeout(pollAnalysisStatus, 1000);
         }
-        
-        // Update logs
-        await updateLogs();
-        
     } catch (error) {
-        console.error('Status polling error:', error);
         addLog(`Status check failed: ${error.message}`, 'error');
         hideStatus();
     }
 }
 
 async function loadGraphData() {
+    if (!currentAnalysisId) return;
+    
     try {
         const response = await fetch(`/api/analysis/${currentAnalysisId}/graph`);
         currentGraphData = await response.json();
-        renderGraph();
-        updateMetadata();
+        
+        // Show graph
+        elements.emptyState.style.display = 'none';
+        elements.cy.style.display = 'block';
+        
+        // Display graph with current settings
+        displayGraph();
+        
+        addLog('Graph data loaded successfully', 'success');
     } catch (error) {
-        console.error('Graph data loading error:', error);
         addLog(`Failed to load graph data: ${error.message}`, 'error');
     }
-}
-
-async function loadAnalysisResponse() {
-    try {
-        const response = await fetch(`/api/analysis/${currentAnalysisId}/response`);
-        const data = await response.json();
-        
-        if (data.success) {
-            showExportSection();
-            addLog('Analysis response loaded', 'info');
-        }
-    } catch (error) {
-        console.error('Analysis response loading error:', error);
-        addLog(`Failed to load analysis response: ${error.message}`, 'error');
-    }
-}
-
-async function updateLogs() {
-    try {
-        const response = await fetch(`/api/analysis/${currentAnalysisId}/logs`);
-        const logs = await response.json();
-        
-        // Clear existing logs and add new ones
-        elements.logsContent.innerHTML = '';
-        logs.forEach(log => {
-            addLogEntry(log.message, log.level, log.timestamp);
-        });
-    } catch (error) {
-        console.error('Logs update error:', error);
-    }
-}
-
-// Graph rendering
-function renderGraph() {
-    if (!currentGraphData) {
-        showEmptyState();
-        return;
-    }
-    
-    hideEmptyState();
-    
-    // Filter nodes by current view mode
-    const nodes = currentGraphData.nodes.filter(node => node.level === currentViewMode);
-    const edges = currentGraphData.edges.filter(edge => {
-        const sourceId = edge.from_node || edge.from;
-        const targetId = edge.to_node || edge.to;
-        const sourceExists = nodes.some(n => n.id === sourceId);
-        const targetExists = nodes.some(n => n.id === targetId);
-        return sourceExists && targetExists;
-    });
-    
-    // Update stats
-    elements.nodeCount.textContent = `${nodes.length} nodes`;
-    elements.edgeCount.textContent = `${edges.length} connections`;
-    
-    // Clear existing nodes
-    const existingNodes = elements.graphContainer.querySelectorAll('.graph-node');
-    existingNodes.forEach(node => node.remove());
-    
-    // Simple grid layout for spacing
-    const gridCols = Math.ceil(Math.sqrt(nodes.length));
-    const gridSpacingX = 180;
-    const gridSpacingY = 120;
-    nodes.forEach((node, i) => {
-        const col = i % gridCols;
-        const row = Math.floor(i / gridCols);
-        node.position = {
-            x: 60 + col * gridSpacingX,
-            y: 60 + row * gridSpacingY
-        };
-        const nodeElement = createNodeElement(node);
-        elements.graphContainer.appendChild(nodeElement);
-    });
-    
-    // Create edges (simple lines for now)
-    createEdges(edges);
-}
-
-function createNodeElement(node) {
-    const nodeElement = document.createElement('div');
-    nodeElement.className = `graph-node ${node.level.toLowerCase()}`;
-    nodeElement.dataset.nodeId = node.id;
-    
-    // Position the node
-    const position = node.position || { x: Math.random() * 400 + 50, y: Math.random() * 300 + 50 };
-    nodeElement.style.left = `${position.x}px`;
-    nodeElement.style.top = `${position.y}px`;
-    
-    nodeElement.innerHTML = `
-        <div class="graph-node-title">${node.name}</div>
-        <div class="graph-node-type">${node.type}</div>
-    `;
-    
-    nodeElement.addEventListener('click', () => selectNode(node));
-    
-    return nodeElement;
-}
-
-function createEdges(edges) {
-    // For simplicity, we'll just create simple SVG lines
-    // In a real implementation, you might want to use a proper graph library
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.style.position = 'absolute';
-    svg.style.top = '0';
-    svg.style.left = '0';
-    svg.style.width = '100%';
-    svg.style.height = '100%';
-    svg.style.pointerEvents = 'none';
-    svg.style.zIndex = '1';
-    
-    edges.forEach(edge => {
-        const sourceNode = document.querySelector(`[data-node-id="${edge.from_node || edge.from}"]`);
-        const targetNode = document.querySelector(`[data-node-id="${edge.to_node || edge.to}"]`);
-        
-        if (sourceNode && targetNode) {
-            const sourceRect = sourceNode.getBoundingClientRect();
-            const targetRect = targetNode.getBoundingClientRect();
-            const containerRect = elements.graphContainer.getBoundingClientRect();
-            
-            const x1 = sourceRect.left + sourceRect.width / 2 - containerRect.left;
-            const y1 = sourceRect.top + sourceRect.height / 2 - containerRect.top;
-            const x2 = targetRect.left + targetRect.width / 2 - containerRect.left;
-            const y2 = targetRect.top + targetRect.height / 2 - containerRect.top;
-            
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', x1);
-            line.setAttribute('y1', y1);
-            line.setAttribute('x2', x2);
-            line.setAttribute('y2', y2);
-            line.setAttribute('stroke', '#e5e7eb');
-            line.setAttribute('stroke-width', '2');
-            
-            svg.appendChild(line);
-        }
-    });
-    
-    // Remove existing SVG and add new one
-    const existingSvg = elements.graphContainer.querySelector('svg');
-    if (existingSvg) {
-        existingSvg.remove();
-    }
-    elements.graphContainer.appendChild(svg);
 }
 
 // Node selection
 function selectNode(node) {
     selectedNode = node;
-    
-    // Update node selection visual
-    document.querySelectorAll('.graph-node').forEach(el => {
-        el.classList.remove('selected');
-    });
-    
-    const nodeElement = document.querySelector(`[data-node-id="${node.id}"]`);
-    if (nodeElement) {
-        nodeElement.classList.add('selected');
-    }
-    
     showNodeDetails(node);
 }
 
 function showNodeDetails(node) {
-    elements.nodeDetailsTitle.textContent = node.name;
+    elements.nodeDetailsTitle.textContent = node.name || node.id;
     
-    const content = `
-        <div class="detail-item">
-            <div class="detail-label">Type</div>
-            <div class="detail-value">${node.type}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Level</div>
-            <div class="detail-value">${node.level}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Purpose</div>
-            <div class="detail-value">${node.metadata?.purpose || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Complexity</div>
-            <div class="detail-value">${node.metadata?.complexity || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Language</div>
-            <div class="detail-value">${node.metadata?.language || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Line Count</div>
-            <div class="detail-value">${node.metadata?.line_count || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Files</div>
-            <div class="detail-value files">${(node.files || []).join('\n')}</div>
-        </div>
-    `;
+    const details = [];
+    details.push(`<div class="detail-item"><span class="detail-label">Type:</span> <span class="detail-value">${node.type}</span></div>`);
+    details.push(`<div class="detail-item"><span class="detail-label">Level:</span> <span class="detail-value">${node.level}</span></div>`);
     
-    elements.nodeDetailsContent.innerHTML = content;
-    elements.nodeDetails.style.display = 'flex';
+    if (node.metadata?.purpose) {
+        details.push(`<div class="detail-item"><span class="detail-label">Purpose:</span> <span class="detail-value">${node.metadata.purpose}</span></div>`);
+    }
+    
+    if (node.metadata?.complexity) {
+        details.push(`<div class="detail-item"><span class="detail-label">Complexity:</span> <span class="detail-value">${node.metadata.complexity}</span></div>`);
+    }
+    
+    if (node.files && node.files.length > 0) {
+        details.push(`<div class="detail-item"><span class="detail-label">Files:</span> <span class="detail-value files">${node.files.join('<br>')}</span></div>`);
+    }
+    
+    if (node.functions && node.functions.length > 0) {
+        details.push(`<div class="detail-item"><span class="detail-label">Functions:</span> <span class="detail-value">${node.functions.join(', ')}</span></div>`);
+    }
+    
+    if (node.classes && node.classes.length > 0) {
+        details.push(`<div class="detail-item"><span class="detail-label">Classes:</span> <span class="detail-value">${node.classes.join(', ')}</span></div>`);
+    }
+    
+    elements.nodeDetailsContent.innerHTML = details.join('');
+    elements.nodeDetails.style.display = 'block';
 }
 
 function closeNodeDetails() {
-    selectedNode = null;
     elements.nodeDetails.style.display = 'none';
-    
-    // Remove node selection visual
-    document.querySelectorAll('.graph-node').forEach(el => {
-        el.classList.remove('selected');
-    });
-}
-
-// View switching
-function switchView(view) {
-    currentViewMode = view;
-    
-    // Update view buttons
-    elements.viewBtns.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.view === view);
-    });
-    
-    // Update graph title
-    elements.graphTitle.textContent = view === 'HLD' ? 'High-Level Design Graph' : 'Low-Level Design Graph';
-    
-    // Re-render graph
-    if (currentGraphData) {
-        renderGraph();
-    }
-    
-    // Clear node selection
-    closeNodeDetails();
+    selectedNode = null;
 }
 
 // Export handling
 async function handleExport(format) {
+    if (!currentAnalysisId) {
+        addLog('No analysis data to export', 'error');
+        return;
+    }
+    
     try {
-        const response = await fetch(`/api/download/${format}`);
-        const data = await response.json();
+        const response = await fetch(`/api/analysis/${currentAnalysisId}/export/${format}`);
+        const blob = await response.blob();
         
-        // For demo purposes, just show the download URL
-        // In a real implementation, this would trigger an actual download
-        alert(`Download ready: ${data.download_url}`);
-        addLog(`Export requested: ${format.toUpperCase()}`, 'info');
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `autograph_${format}_${Date.now()}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
         
+        addLog(`Exported ${format.toUpperCase()} successfully`, 'success');
     } catch (error) {
-        console.error('Export error:', error);
         addLog(`Export failed: ${error.message}`, 'error');
     }
 }
@@ -532,7 +724,7 @@ async function handleExport(format) {
 // Utility functions
 function showStatus(message) {
     elements.statusSection.style.display = 'block';
-    elements.statusMessage.textContent = message;
+    updateStatusMessage(message);
 }
 
 function hideStatus() {
@@ -584,22 +776,8 @@ function updateMetadata() {
     elements.metadataSection.style.display = 'block';
 }
 
-function showEmptyState() {
-    elements.emptyState.style.display = 'block';
-    elements.nodeCount.textContent = '0 nodes';
-    elements.edgeCount.textContent = '0 connections';
-}
-
-function hideEmptyState() {
-    elements.emptyState.style.display = 'none';
-}
-
 function addLog(message, level = 'info') {
     const timestamp = new Date().toLocaleTimeString();
-    addLogEntry(message, level, timestamp);
-}
-
-function addLogEntry(message, level, timestamp) {
     const logEntry = document.createElement('div');
     logEntry.className = 'log-entry';
     logEntry.innerHTML = `
@@ -609,27 +787,4 @@ function addLogEntry(message, level, timestamp) {
     
     elements.logsContent.appendChild(logEntry);
     elements.logsContent.scrollTop = elements.logsContent.scrollHeight;
-}
-
-// Graph controls (simplified)
-function zoomGraph(delta) {
-    // In a real implementation, this would zoom the graph
-    console.log('Zoom:', delta);
-}
-
-function fitView() {
-    // In a real implementation, this would fit the graph to view
-    console.log('Fit view');
-}
-
-// Enhanced view functionality
-function openEnhancedView() {
-    if (!currentAnalysisId) {
-        alert('Please run an analysis first to view the enhanced visualization');
-        return;
-    }
-    
-    // Open the enhanced view in a new tab/window
-    const enhancedViewUrl = `/graph-view?analysis_id=${currentAnalysisId}`;
-    window.open(enhancedViewUrl, '_blank');
 } 

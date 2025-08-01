@@ -25,7 +25,7 @@ body {
     background: white;
     border-bottom: 1px solid #e5e7eb;
     padding: 0 24px;
-    height: 64px;
+    height: 80px;
     display: flex;
     align-items: center;
 }
@@ -70,56 +70,119 @@ body {
 .header-right {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 20px;
 }
 
-.view-toggle {
+/* Depth Controls */
+.depth-controls {
     display: flex;
-    background: #f3f4f6;
-    border-radius: 8px;
-    padding: 4px;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
 }
 
-.view-btn {
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    border: none;
-    background: transparent;
-    border-radius: 6px;
+.depth-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    text-align: center;
+}
+
+.slider-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.depth-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    -webkit-appearance: none;
     cursor: pointer;
-    transition: all 0.2s;
 }
 
-.view-btn.active {
+.depth-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
     background: #3b82f6;
-    color: white;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
-.view-btn:not(.active) {
+.depth-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
     color: #6b7280;
 }
 
-.view-btn:not(.active):hover {
-    color: #111827;
+/* View Controls */
+.view-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mode-btn {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 500;
+    border: 2px solid transparent;
+    font-size: 12px;
+}
+
+.mode-btn.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.mode-btn:hover {
+    background: #e9ecef;
+    border-color: #dee2e6;
+}
+
+.mode-btn.active:hover {
+    background: #2563eb;
 }
 
 .help-btn {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     border: none;
-    background: transparent;
+    background: #f3f4f6;
+    border-radius: 8px;
     color: #6b7280;
     cursor: pointer;
-    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.2s;
 }
 
 .help-btn:hover {
-    background: #f3f4f6;
-    color: #111827;
+    background: #e5e7eb;
+    color: #374151;
 }
 
 /* Main Content */
@@ -455,11 +518,20 @@ body {
     gap: 6px;
 }
 
-/* Graph Container */
+/* Graph Container for Cytoscape */
+#cy {
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+}
+
 .graph-container {
-    flex: 1;
     position: relative;
-    background: white;
+    flex: 1;
+    background: #ffffff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .empty-state {
@@ -617,6 +689,20 @@ body {
     padding: 8px;
     border-radius: 4px;
     white-space: pre-wrap;
+}
+
+/* PM Info Section */
+.pm-info-content {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    border-left: 4px solid #3b82f6;
+}
+
+.pm-info-content div {
+    margin: 4px 0;
+    color: #666;
 }
 
 /* Responsive Design */
