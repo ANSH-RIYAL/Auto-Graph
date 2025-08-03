@@ -171,4 +171,8 @@ cache/
 
 # Backup files
 *.bak
-*.backup 
+*.backup
+
+# LinkedIn posts and content
+linkedin_post.md
+linkedin_stuff/ 
