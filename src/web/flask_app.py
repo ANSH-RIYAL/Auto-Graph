@@ -115,7 +115,9 @@ def convert_analysis_result_to_frontend_format(analysis_result):
             "metadata": {
                 "relationship_type": edge.metadata.get('relationship_type', 'dependency') if edge.metadata else 'dependency',
                 "communication_type": edge.metadata.get('communication_type', '') if edge.metadata else '',
-                "bidirectional": edge.metadata.get('bidirectional', False) if edge.metadata else False
+                "bidirectional": edge.metadata.get('bidirectional', False) if edge.metadata else False,
+                # Optional examples for edge payloads (requests/queries) to show in details panel
+                "examples": edge.metadata.get('examples', []) if edge.metadata else []
             }
         }
         edges.append(frontend_edge)
@@ -162,12 +164,13 @@ def convert_analysis_result_to_frontend_format(analysis_result):
         impl_nodes = [n for n in nodes if n['level'] == 'IMPLEMENTATION']
 
         # Map of parent relationships from edges
-        parent_of = {e['to_node']: e['from_node'] for e in edges if e['type'] == 'contains'}
+        parent_of = {e['to_node']: e['from_node'] for e in edges if e['type'].lower() == 'contains'}
 
         # Sort business nodes for deterministic ordering
         business_nodes.sort(key=lambda n: n['name'])
         column_spacing = 350
-        row_y = {1: 150, 2: 350, 3: 550}
+        # Add more vertical layers to reduce overlap risk
+        row_y = {1: 150, 2: 330, 3: 510}
 
         # Assign positions for business nodes
         business_x = {}
@@ -187,7 +190,7 @@ def convert_analysis_result_to_frontend_format(analysis_result):
             px = business_x.get(parent, 200)
             count = len(group)
             for j, sn in enumerate(group):
-                offset = (j - (count - 1) / 2.0) * 160
+                offset = (j - (count - 1) / 2.0) * 180
                 sn['position'] = {"x": px + offset, "y": row_y[2]}
 
         # Group implementation nodes under system (fallback to business if no system parent)
@@ -202,7 +205,7 @@ def convert_analysis_result_to_frontend_format(analysis_result):
             px = system_x.get(parent, business_x.get(parent, 200))
             count = len(group)
             for k, inn in enumerate(group):
-                offset = (k - (count - 1) / 2.0) * 120
+                offset = (k - (count - 1) / 2.0) * 140
                 inn['position'] = {"x": px + offset, "y": row_y[3]}
     except Exception as _:
         # If anything fails, keep zero positions and let client layout fallback

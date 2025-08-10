@@ -189,13 +189,10 @@ function initializeCytoscape() {
                 selector: 'edge',
                 style: {
                     'width': 4,
-                    'line-color': '#34495e',
-                    'target-arrow-color': '#34495e',
+                    'line-color': '#95a5a6',
+                    'target-arrow-color': '#95a5a6',
                     'target-arrow-shape': 'triangle',
                     'target-arrow-width': 8,
-                    'source-arrow-color': 'data(sourceArrowColor)',
-                    'source-arrow-shape': 'data(sourceArrowShape)',
-                    'source-arrow-width': 8,
                     'curve-style': 'bezier',
                     'content': 'data(label)',
                     'font-size': '11px',
@@ -205,15 +202,19 @@ function initializeCytoscape() {
                     'text-background-color': 'white',
                     'text-background-opacity': 0.9,
                     'text-background-padding': 4,
-                    'text-border-color': '#34495e',
+                    'text-border-color': '#7f8c8d',
                     'text-border-width': 1,
                     'text-border-opacity': 0.5,
                     'text-outline-width': 1,
                     'text-outline-color': 'white',
                     'text-outline-opacity': 0.8,
+                    'text-opacity': 0,
                     'opacity': 0.2
                 }
             },
+            { selector: 'edge[type = "contains"]', style: { 'line-color': '#27ae60', 'target-arrow-color': '#27ae60' } },
+            { selector: 'edge[type = "depends_on"]', style: { 'line-color': '#2980b9', 'target-arrow-color': '#2980b9', 'line-style': 'dashed' } },
+            { selector: 'edge[type = "calls"]', style: { 'line-color': '#e67e22', 'target-arrow-color': '#e67e22', 'line-style': 'dotted' } },
             {
                 selector: 'edge:selected',
                 style: {
@@ -227,9 +228,9 @@ function initializeCytoscape() {
                 selector: 'edge[bidirectional = "true"]',
                 style: {
                     'source-arrow-shape': 'triangle',
-                    'source-arrow-color': '#34495e',
+                    'source-arrow-color': '#7f8c8d',
                     'source-arrow-width': 8,
-                    'opacity': 1
+                    'opacity': 0.2
                 }
             },
             {
@@ -242,6 +243,14 @@ function initializeCytoscape() {
                     'line-style': 'solid',
                     'opacity': 0.2
                 }
+            },
+            {
+                selector: 'edge:selected',
+                style: {
+                    'opacity': 1,
+                    'width': 5,
+                    'text-opacity': 1
+                }
             }
         ],
         layout: { name: 'preset' }
@@ -249,8 +258,23 @@ function initializeCytoscape() {
 
     // Add event listeners for Cytoscape
     cy.on('tap', 'node', function(evt) {
-        const node = evt.target;
-        selectNode(node.data());
+        const nodeEle = evt.target;
+        selectNode(nodeEle.data());
+        highlightEdgesForNode(nodeEle);
+    });
+
+    cy.on('tap', 'edge', function(evt) {
+        const edgeEle = evt.target;
+        showEdgeDetails(edgeEle.data());
+        cy.elements('edge').unselect();
+        edgeEle.select();
+    });
+
+    cy.on('tap', function(evt) {
+        if (evt.target === cy) {
+            clearEdgeHighlight();
+            closeNodeDetails();
+        }
     });
 }
 
@@ -408,15 +432,23 @@ function displayGraph() {
     });
 
     const visible = new Set(filteredNodes.map(n => n.id));
+    const showContains = document.getElementById('filterContains')?.checked !== false;
+    const showDepends = document.getElementById('filterDepends')?.checked === true;
+    const showCalls = document.getElementById('filterCalls')?.checked === true;
     currentGraphData.edges.forEach(edge => {
         if (!visible.has(edge.from_node) || !visible.has(edge.to_node)) return;
+        const t = (edge.type || '').toLowerCase();
+        if (t === 'contains' && !showContains) return;
+        if ((t === 'depends_on' || t === 'depends') && !showDepends) return;
+        if (t === 'calls' && !showCalls) return;
         const edgeKey = edge.id || `${edge.from_node}-${edge.to_node}`;
         elements.push({
             data: {
                 id: edgeKey,
                 source: edge.from_node,
                 target: edge.to_node,
-                label: edge.metadata?.relationship_type || edge.type || ''
+                label: edge.metadata?.relationship_type || edge.type || '',
+                type: edge.type
             }
         });
     });
@@ -715,6 +747,33 @@ async function loadGraphData() {
 function selectNode(node) {
     selectedNode = node;
     showNodeDetails(node);
+}
+
+function clearEdgeHighlight() {
+    if (!cy) return;
+    cy.elements('edge').style({'opacity': 0.2, 'text-opacity': 0});
+}
+
+function highlightEdgesForNode(nodeEle) {
+    clearEdgeHighlight();
+    const connected = nodeEle.connectedEdges();
+    connected.forEach(e => e.style({'opacity': 1, 'text-opacity': 1}));
+}
+
+function showEdgeDetails(edgeData) {
+    const src = cy.getElementById(edgeData.source).data();
+    const tgt = cy.getElementById(edgeData.target).data();
+    elements.nodeDetailsTitle.textContent = 'Connection Details';
+    const examples = edgeData.metadata?.examples || [];
+    const items = [];
+    items.push(`<div class="detail-item"><span class="detail-label">Type:</span> <span class="detail-value">${edgeData.type || ''}</span></div>`);
+    items.push(`<div class="detail-item"><span class="detail-label">From:</span> <span class="detail-value">${src.label}</span></div>`);
+    items.push(`<div class="detail-item"><span class="detail-label">To:</span> <span class="detail-value">${tgt.label}</span></div>`);
+    if (examples.length) {
+        items.push(`<div class="detail-item"><span class="detail-label">Examples:</span><pre class="detail-value">${examples.map(e => JSON.stringify(e, null, 2)).join('\n\n')}</pre></div>`);
+    }
+    elements.nodeDetailsContent.innerHTML = items.join('');
+    elements.nodeDetails.style.display = 'block';
 }
 
 function showNodeDetails(node) {
