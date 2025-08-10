@@ -52,9 +52,9 @@
                     <div class="tab-content active" id="upload-tab">
                         <div class="file-drop-zone" id="fileDropZone">
                             <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Drop files here or click to browse</p>
-                            <span>Supports .zip, .tar.gz, or individual files</span>
-                            <input type="file" id="fileInput" multiple accept=".zip,.tar,.gz,.js,.ts,.py,.java,.cpp,.c,.h" style="display: none;">
+                            <p>Drop a folder or zip here, or click to browse</p>
+                            <span>Supports folders (recommended) or .zip</span>
+                            <input type="file" id="fileInput" multiple webkitdirectory directory style="display: none;">
                         </div>
                     </div>
 
@@ -100,11 +100,11 @@
                             <span class="stat-value" id="coveragePercent">0%</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">HLD Nodes</span>
+                            <span class="stat-label">Business Nodes</span>
                             <span class="stat-value" id="hldNodes">0</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">LLD Nodes</span>
+                            <span class="stat-label">Implementation Nodes</span>
                             <span class="stat-value" id="lldNodes">0</span>
                         </div>
                         <div class="stat-item">
@@ -200,15 +200,10 @@
                 </div>
 
                 <!-- Export Panel -->
-                <div class="sidebar-section" id="exportSection" style="display: none;">
-                    <h2>Export Formats</h2>
+                    <div class="sidebar-section" id="exportSection" style="display: none;">
+                    <h2>Export</h2>
                     <div class="export-grid">
                         <button class="export-btn" data-format="json">JSON</button>
-                        <button class="export-btn" data-format="yaml">YAML</button>
-                        <button class="export-btn" data-format="csv">CSV</button>
-                        <button class="export-btn" data-format="dot">DOT</button>
-                        <button class="export-btn" data-format="html">HTML</button>
-                        <button class="export-btn" data-format="mermaid">Mermaid</button>
                     </div>
                 </div>
 
@@ -266,9 +261,11 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="view-controls">
-                                <button class="mode-btn active" onclick="setViewMode('HIERARCHY')" id="hierarchyBtn">Hierarchy View</button>
-                                <button class="mode-btn" onclick="setViewMode('CONNECTIONS')" id="connectionsBtn">All Connections</button>
+                            <div class="edge-filter" style="margin-left:16px;">
+                                <div class="depth-label">Edge Types:</div>
+                                <label style="margin-right:10px;"><input type="checkbox" id="filterContains" checked> Contains</label>
+                                <label style="margin-right:10px;"><input type="checkbox" id="filterDepends"> Depends On</label>
+                                <label style="margin-right:10px;"><input type="checkbox" id="filterCalls"> Calls</label>
                             </div>
                         </div>
                     </div>

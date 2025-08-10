@@ -91,23 +91,184 @@ class EnhancedGraphBuilder:
         # Create graph metadata
         metadata = self._create_enhanced_graph_metadata(codebase_path, parsing_result)
         
-        # Create HLD nodes with semantic analysis
+        # Create BUSINESS nodes with semantic analysis
         hld_nodes = self._create_enhanced_hld_nodes(parsing_result)
         
-        # Create LLD nodes with semantic analysis
+        # Create IMPLEMENTATION nodes with semantic analysis
         lld_nodes = self._create_enhanced_lld_nodes(parsing_result)
-        
+
+        # Phase 2: Build SYSTEM nodes from import graph clustering
+        system_nodes, system_edges = self._create_system_nodes_and_edges(parsing_result, hld_nodes, lld_nodes)
+
         # Create enhanced edges with relationship mapping
         edges = self._create_enhanced_graph_edges(parsing_result, hld_nodes, lld_nodes)
+        edges.extend(system_edges)
         
         # Build the graph
         graph = Graph(
             metadata=metadata,
-            nodes=list(hld_nodes.values()) + list(lld_nodes.values()),
+            nodes=list(hld_nodes.values()) + list(system_nodes.values()) + list(lld_nodes.values()),
             edges=edges
         )
         
         return graph
+
+    def _create_system_nodes_and_edges(self, parsing_result: Dict[str, Any],
+                                       business_nodes: Dict[str, GraphNode],
+                                       impl_nodes: Dict[str, GraphNode]) -> (Dict[str, GraphNode], List[GraphEdge]):
+        """Create SYSTEM-level nodes via lightweight clustering of the import graph.
+        Fallback to directory-based grouping when clustering is unavailable or trivial.
+        """
+        try:
+            import networkx as nx
+            from networkx.algorithms.community import greedy_modularity_communities
+        except Exception:
+            nx = None
+            greedy_modularity_communities = None
+
+        # Build a file-level import graph
+        file_imports = {}
+        file_paths = list(parsing_result['parsed_files'].keys())
+        normalized = {fp: Path(fp) for fp in file_paths}
+
+        def matches_import(target_path: Path, imp: str) -> bool:
+            # Simple heuristics to link imports to files
+            stem = target_path.stem
+            parts = imp.replace(' ', '').replace(':', '').split('.')
+            return stem in parts or any(stem in p for p in parts)
+
+        for fp, data in parsing_result['parsed_files'].items():
+            imps = data.get('imports', []) or []
+            targets = set()
+            for other in file_paths:
+                if other == fp:
+                    continue
+                if any(matches_import(normalized[other], imp) for imp in imps):
+                    targets.add(other)
+            file_imports[fp] = list(targets)
+
+        # Create clusters
+        clusters: List[List[str]] = []
+        if nx is not None and greedy_modularity_communities is not None:
+            G = nx.Graph()
+            G.add_nodes_from(file_paths)
+            for src, tgts in file_imports.items():
+                for tgt in tgts:
+                    G.add_edge(src, tgt)
+            if G.number_of_edges() > 0:
+                comms = list(greedy_modularity_communities(G))
+                clusters = [list(c) for c in comms if len(c) > 0]
+            else:
+                clusters = [[fp] for fp in file_paths]
+        else:
+            # Fallback: group by immediate parent directory name
+            dir_groups: Dict[str, List[str]] = {}
+            for fp in file_paths:
+                key = Path(fp).parent.name or 'root'
+                dir_groups.setdefault(key, []).append(fp)
+            clusters = list(dir_groups.values())
+
+        # Create SYSTEM nodes from clusters
+        system_nodes: Dict[str, GraphNode] = {}
+        system_edges: List[GraphEdge] = []
+
+        # Helper to find business parent by overlap of files
+        def find_business_parent(files: List[str]) -> Optional[GraphNode]:
+            best = None
+            best_overlap = 0
+            file_set = set(files)
+            for bn in business_nodes.values():
+                overlap = len(file_set.intersection(set(bn.files)))
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best = bn
+            return best
+
+        # Map impl nodes to their primary file
+        impl_by_file: Dict[str, List[GraphNode]] = {}
+        for node in impl_nodes.values():
+            for f in node.files:
+                impl_by_file.setdefault(f, []).append(node)
+
+        # Create nodes and containment edges
+        for idx, files in enumerate(clusters):
+            # Heuristic name: prefer shared parent directory, else first file stem
+            dir_names = [Path(f).parent.name for f in files]
+            common_dir = max(set(dir_names), key=dir_names.count) if dir_names else f"cluster_{idx+1}"
+            first_stem = Path(files[0]).stem if files else f"cluster_{idx+1}"
+            pretty_name = common_dir.replace('_',' ').title() if common_dir else first_stem.title()
+            node_id = f"system_{common_dir}_{idx+1}"
+            system_node = GraphNode(
+                id=node_id,
+                name=f"{pretty_name}",
+                type=NodeType.SERVICE,
+                level=NodeLevel.SYSTEM,
+                files=files,
+                metadata=NodeMetadata(
+                    purpose=f"Cluster of {len(files)} files under {common_dir}",
+                    complexity=ComplexityLevel.MEDIUM,
+                    dependencies=[],
+                    line_count=0,
+                    file_size=0,
+                    language='python',
+                    category='cluster',
+                    technical_depth=TechnicalDepth.SYSTEM,
+                    color=self._get_node_color(NodeType.SERVICE),
+                    size=len(files) * 8
+                )
+            )
+            system_nodes[node_id] = system_node
+
+            # Parent under business node
+            parent_business = find_business_parent(files)
+            if parent_business:
+                system_edges.append(GraphEdge(
+                    from_node=parent_business.id,
+                    to_node=node_id,
+                    type=EdgeType.CONTAINS,
+                    metadata={'relationship_type': 'hierarchy'}
+                ))
+                system_node.parent = parent_business.id
+                parent_business.children.append(node_id)
+
+            # Attach implementation nodes contained in this cluster
+            for f in files:
+                for impl in impl_by_file.get(f, []):
+                    system_edges.append(GraphEdge(
+                        from_node=node_id,
+                        to_node=impl.id,
+                        type=EdgeType.CONTAINS,
+                        metadata={'relationship_type': 'hierarchy'}
+                    ))
+                    impl.parent = node_id
+                    system_node.children.append(impl.id)
+
+        # Collapse file-level imports into system-level depends_on edges
+        # Map file to system cluster id
+        file_to_cluster: Dict[str, str] = {}
+        for sid, snode in system_nodes.items():
+            for f in snode.files:
+                file_to_cluster[f] = sid
+
+        seen_pairs = set()
+        for src, tgts in file_imports.items():
+            src_cluster = file_to_cluster.get(src)
+            for tgt in tgts:
+                tgt_cluster = file_to_cluster.get(tgt)
+                if not src_cluster or not tgt_cluster or src_cluster == tgt_cluster:
+                    continue
+                key = (src_cluster, tgt_cluster)
+                if key in seen_pairs:
+                    continue
+                seen_pairs.add(key)
+                system_edges.append(GraphEdge(
+                    from_node=src_cluster,
+                    to_node=tgt_cluster,
+                    type=EdgeType.DEPENDS_ON,
+                    metadata={'relationship_type': 'depends_on'}
+                ))
+
+        return system_nodes, system_edges
     
     def _create_enhanced_graph_metadata(self, codebase_path: str, parsing_result: Dict[str, Any]) -> GraphMetadata:
         """Create enhanced graph metadata with semantic analysis statistics."""
@@ -160,7 +321,7 @@ class EnhancedGraphBuilder:
         )
     
     def _create_enhanced_hld_nodes(self, parsing_result: Dict[str, Any]) -> Dict[str, GraphNode]:
-        """Create enhanced HLD nodes with semantic analysis."""
+        """Create enhanced Business nodes with semantic analysis."""
         hld_nodes = {}
         
         # Group files by semantic analysis results
@@ -178,7 +339,7 @@ class EnhancedGraphBuilder:
                 id=node_id,
                 name=group_name,
                 type=group_semantics.get('component_type', NodeType.MODULE),
-                level=NodeLevel.HLD,
+                level=NodeLevel.BUSINESS,
                 files=files,
                 metadata=self._create_enhanced_node_metadata(files, parsing_result, group_semantics)
             )
@@ -186,7 +347,7 @@ class EnhancedGraphBuilder:
         return hld_nodes
     
     def _create_enhanced_lld_nodes(self, parsing_result: Dict[str, Any]) -> Dict[str, GraphNode]:
-        """Create enhanced LLD nodes with semantic analysis - grouped by logical containers."""
+        """Create enhanced Implementation nodes with semantic analysis - grouped by logical containers."""
         lld_nodes = {}
         
         # Track logical groupings
@@ -214,7 +375,7 @@ class EnhancedGraphBuilder:
                         id=node_id,
                         name=f"{class_name} Class",
                         type=NodeType.CLASS,
-                        level=NodeLevel.LLD,
+                        level=NodeLevel.IMPLEMENTATION,
                         files=[file_path],
                         classes=[class_name],
                         functions=filtered_functions,
@@ -243,7 +404,7 @@ class EnhancedGraphBuilder:
                             id=node_id,
                             name=f"{group_name} Functions",
                             type=NodeType.FUNCTION_GROUP,
-                            level=NodeLevel.LLD,
+                            level=NodeLevel.IMPLEMENTATION,
                             files=[file_path],
                             functions=group_functions,
                             metadata=self._create_enhanced_function_group_metadata(group_name, group_functions, file_path, parsing_result, semantic_result)
@@ -337,7 +498,7 @@ class EnhancedGraphBuilder:
         """Create enhanced graph edges with relationship mapping."""
         edges = []
         
-        # Create containment edges (HLD contains LLD)
+        # Create containment edges (BUSINESS contains IMPLEMENTATION)
         for lld_node in lld_nodes.values():
             for file_path in lld_node.files:
                 parent_hld = self._find_parent_hld_node(file_path, hld_nodes)
@@ -427,8 +588,8 @@ class EnhancedGraphBuilder:
                 total_lines += file_info.line_count
                 total_size += file_info.size
         
-        # Determine technical depth based on node level (HLD = business, LLD = implementation)
-        technical_depth = TechnicalDepth.BUSINESS  # Default for HLD nodes
+        # Determine technical depth based on node level (Business default)
+        technical_depth = TechnicalDepth.BUSINESS
         
         # Determine color based on component type
         color = self._get_node_color(semantic_result.get('component_type', NodeType.MODULE))
@@ -512,7 +673,7 @@ class EnhancedGraphBuilder:
         )
     
     def _find_parent_hld_node(self, file_path: str, hld_nodes: Dict[str, GraphNode]) -> Optional[GraphNode]:
-        """Find the HLD node that contains a given file."""
+        """Find the BUSINESS node that contains a given file."""
         for hld_node in hld_nodes.values():
             if file_path in hld_node.files:
                 return hld_node
@@ -571,7 +732,7 @@ class EnhancedGraphBuilder:
         """Get default semantic analysis when analysis fails."""
         return {
             'purpose': f"File: {Path(file_path).name}",
-            'level': NodeLevel.LLD,
+            'level': NodeLevel.IMPLEMENTATION,
             'component_type': NodeType.MODULE,
             'complexity': ComplexityLevel.LOW,
             'relationships': {},
@@ -591,8 +752,8 @@ class EnhancedGraphBuilder:
                 logger.warning(f"  - {issue}")
         
         # Update graph statistics
-        hld_nodes = [node for node in graph.nodes if node.level == NodeLevel.HLD]
-        lld_nodes = [node for node in graph.nodes if node.level == NodeLevel.LLD]
+        hld_nodes = [node for node in graph.nodes if node.level == NodeLevel.BUSINESS]
+        lld_nodes = [node for node in graph.nodes if node.level == NodeLevel.IMPLEMENTATION]
         
         # Count nodes by technical depth
         technical_depths = {
@@ -604,8 +765,11 @@ class EnhancedGraphBuilder:
         # Update graph statistics
         graph.metadata.statistics = GraphStatistics(
             total_nodes=len(graph.nodes),
-            hld_nodes=len(hld_nodes),
-            lld_nodes=len(lld_nodes),
+            hld_nodes=len(hld_nodes),  # legacy
+            lld_nodes=len(lld_nodes),  # legacy
+            business_nodes=len(hld_nodes),
+            system_nodes=len([n for n in graph.nodes if n.metadata.technical_depth == TechnicalDepth.SYSTEM]),
+            implementation_nodes=len(lld_nodes),
             total_edges=len(graph.edges),
             technical_depths=technical_depths
         )

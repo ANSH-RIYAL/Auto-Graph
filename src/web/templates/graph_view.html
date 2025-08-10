@@ -368,7 +368,7 @@
             // Add technical_depth to nodes
             const nodes = data.nodes.map(node => ({
                 ...node,
-                technical_depth: node.level === 'HLD' ? 1 : 3,
+                technical_depth: node.technical_depth || (node.level === 'BUSINESS' ? 1 : (node.level === 'SYSTEM' ? 2 : 3)),
                 color: getNodeColor(node)
             }));
 
@@ -398,8 +398,8 @@
                     pm_metrics: metadata.pm_metrics,
                     statistics: {
                         total_nodes: nodes.length,
-                        hld_nodes: nodes.filter(n => n.level === 'HLD').length,
-                        lld_nodes: nodes.filter(n => n.level === 'LLD').length,
+                        business_nodes: nodes.filter(n => n.level === 'BUSINESS').length,
+                        implementation_nodes: nodes.filter(n => n.level === 'IMPLEMENTATION').length,
                         total_edges: edges.length
                     }
                 },
@@ -426,8 +426,8 @@
             currentViewMode = mode;
             document.getElementById('hierarchyBtn').classList.toggle('active', mode === 'HIERARCHY');
             document.getElementById('connectionsBtn').classList.toggle('active', mode === 'CONNECTIONS');
-            document.getElementById('hldBtn').classList.toggle('active', mode === 'HLD');
-            document.getElementById('lldBtn').classList.toggle('active', mode === 'LLD');
+            document.getElementById('hldBtn').classList.toggle('active', mode === 'BUSINESS');
+            document.getElementById('lldBtn').classList.toggle('active', mode === 'IMPLEMENTATION');
             
             if (allData) {
                 displayGraph();
@@ -472,23 +472,23 @@
             
             // Filter nodes by technical depth
             const filteredNodes = allData.nodes.filter(node => {
-                const nodeDepth = node.technical_depth || (node.level === 'HLD' ? 1 : 3);
-                return nodeDepth <= currentDepth;
+                const inferredDepth = node.technical_depth || (node.level === 'BUSINESS' ? 1 : (node.level === 'SYSTEM' ? 2 : 3));
+                return inferredDepth <= currentDepth;
             });
             
-            if (currentViewMode === 'HIERARCHY' || currentViewMode === 'HLD' || currentViewMode === 'LLD') {
+            if (currentViewMode === 'HIERARCHY' || currentViewMode === 'BUSINESS' || currentViewMode === 'IMPLEMENTATION') {
                 // Filter nodes based on view mode
                 let displayNodes = filteredNodes;
-                if (currentViewMode === 'HLD') {
-                    displayNodes = filteredNodes.filter(node => node.level === 'HLD');
-                } else if (currentViewMode === 'LLD') {
-                    displayNodes = filteredNodes.filter(node => node.level === 'LLD');
+                if (currentViewMode === 'BUSINESS') {
+                    displayNodes = filteredNodes.filter(node => node.level === 'BUSINESS');
+                } else if (currentViewMode === 'IMPLEMENTATION') {
+                    displayNodes = filteredNodes.filter(node => node.level === 'IMPLEMENTATION');
                 }
                 
                 // Show hierarchical view based on depth
-                if (currentDepth === 1 || currentViewMode === 'HLD') {
+                if (currentDepth === 1 || currentViewMode === 'BUSINESS') {
                     // Business level - show only HLD nodes
-                    const hldNodes = displayNodes.filter(node => node.level === 'HLD');
+                    const hldNodes = displayNodes.filter(node => node.level === 'BUSINESS');
                     hldNodes.forEach((node, index) => {
                         elements.push({
                             data: {
@@ -506,8 +506,8 @@
                     });
                 } else {
                     // System/Implementation levels - show hierarchy
-                    const hldNodes = displayNodes.filter(node => node.level === 'HLD');
-                    const lldNodes = displayNodes.filter(node => node.level === 'LLD');
+                    const hldNodes = displayNodes.filter(node => node.level === 'BUSINESS');
+                    const lldNodes = displayNodes.filter(node => node.level === 'IMPLEMENTATION');
                 
                     // Add HLD nodes at top level
                     hldNodes.forEach((node, index) => {

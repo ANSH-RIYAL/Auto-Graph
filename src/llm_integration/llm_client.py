@@ -95,7 +95,7 @@ class LLMClient:
 
 Your task is to analyze code files and determine:
 1. The component's purpose and responsibility
-2. Whether it belongs to High-Level Design (HLD) or Low-Level Design (LLD)
+        2. Whether it belongs to Business or Implementation level (SYSTEM derived later)
 3. The component type (Module, API, Service, Function, Class, etc.)
 4. Complexity level (low, medium, high)
 5. Key relationships and dependencies
@@ -103,7 +103,7 @@ Your task is to analyze code files and determine:
 Respond with a JSON object containing:
 {
     "purpose": "Brief description of what this component does",
-    "level": "HLD" or "LLD",
+    "level": "BUSINESS" or "IMPLEMENTATION",
     "component_type": "Module|API|Service|Function|Class|Utility|Controller|Model",
     "complexity": "low|medium|high",
     "relationships": ["list", "of", "key", "dependencies"],
@@ -162,10 +162,10 @@ Provide a JSON analysis of this component's role in the system architecture."""
         # Simple keyword-based parsing
         response_lower = response.lower()
         
-        if 'hld' in response_lower or 'high' in response_lower:
-            result['level'] = 'HLD'
-        elif 'lld' in response_lower or 'low' in response_lower:
-            result['level'] = 'LLD'
+        if 'hld' in response_lower or 'high' in response_lower or 'business' in response_lower:
+            result['level'] = 'BUSINESS'
+        elif 'lld' in response_lower or 'low' in response_lower or 'implementation' in response_lower:
+            result['level'] = 'IMPLEMENTATION'
         
         if 'api' in response_lower:
             result['component_type'] = 'API'
@@ -185,7 +185,7 @@ Provide a JSON analysis of this component's role in the system architecture."""
         # Copy valid fields
         if 'purpose' in result:
             normalized['purpose'] = str(result['purpose'])
-        if 'level' in result and result['level'] in ['HLD', 'LLD']:
+        if 'level' in result and result['level'] in ['BUSINESS', 'SYSTEM', 'IMPLEMENTATION']:
             normalized['level'] = result['level']
         if 'component_type' in result:
             normalized['component_type'] = str(result['component_type'])
@@ -223,72 +223,72 @@ Provide a JSON analysis of this component's role in the system architecture."""
         file_name = Path(file_path).name.lower()
         file_path_lower = str(file_path).lower()
         
-        # Check for HLD components
+        # Check for BUSINESS components
         if any(keyword in file_name for keyword in ['api', 'route', 'endpoint', 'controller']):
-            result['level'] = 'HLD'
+            result['level'] = 'BUSINESS'
             result['component_type'] = 'API'
             result['purpose'] = 'Handles HTTP requests and API endpoints'
             result['complexity'] = 'medium'
         elif any(keyword in file_name for keyword in ['service', 'business', 'manager']):
-            result['level'] = 'HLD'
+            result['level'] = 'BUSINESS'
             result['component_type'] = 'Service'
             result['purpose'] = 'Contains business logic and service operations'
             result['complexity'] = 'medium'
         elif any(keyword in file_name for keyword in ['app', 'main', 'server']):
-            result['level'] = 'HLD'
+            result['level'] = 'BUSINESS'
             result['component_type'] = 'Application'
             result['purpose'] = 'Main application entry point and configuration'
             result['complexity'] = 'high'
         elif any(keyword in file_path_lower for keyword in ['/api/', '/routes/', '/controllers/']):
-            result['level'] = 'HLD'
+            result['level'] = 'BUSINESS'
             result['component_type'] = 'API'
             result['purpose'] = 'API layer component'
             result['complexity'] = 'medium'
         elif any(keyword in file_path_lower for keyword in ['/services/', '/business/']):
-            result['level'] = 'HLD'
+            result['level'] = 'BUSINESS'
             result['component_type'] = 'Service'
             result['purpose'] = 'Business logic service'
             result['complexity'] = 'medium'
-        # Check for LLD components
+        # Check for IMPLEMENTATION components
         elif any(keyword in file_name for keyword in ['model', 'entity', 'schema']):
-            result['level'] = 'LLD'
+            result['level'] = 'IMPLEMENTATION'
             result['component_type'] = 'Model'
             result['purpose'] = 'Defines data models and entities'
             result['complexity'] = 'low'
         elif any(keyword in file_name for keyword in ['util', 'helper', 'tool']):
-            result['level'] = 'LLD'
+            result['level'] = 'IMPLEMENTATION'
             result['component_type'] = 'Utility'
             result['purpose'] = 'Utility functions and helper methods'
             result['complexity'] = 'low'
         elif any(keyword in file_name for keyword in ['test', 'spec']):
-            result['level'] = 'LLD'
+            result['level'] = 'IMPLEMENTATION'
             result['component_type'] = 'Test'
             result['purpose'] = 'Test cases and specifications'
             result['complexity'] = 'low'
         elif any(keyword in file_path_lower for keyword in ['/models/', '/entities/']):
-            result['level'] = 'LLD'
+            result['level'] = 'IMPLEMENTATION'
             result['component_type'] = 'Model'
             result['purpose'] = 'Data model component'
             result['complexity'] = 'low'
         elif any(keyword in file_path_lower for keyword in ['/utils/', '/helpers/']):
-            result['level'] = 'LLD'
+            result['level'] = 'IMPLEMENTATION'
             result['component_type'] = 'Utility'
             result['purpose'] = 'Utility component'
             result['complexity'] = 'low'
         else:
             # Default analysis based on symbols
             if symbols.get('classes'):
-                result['level'] = 'LLD'
+                result['level'] = 'IMPLEMENTATION'
                 result['component_type'] = 'Class'
                 result['purpose'] = 'Class definitions and implementations'
                 result['complexity'] = 'medium'
             elif symbols.get('functions'):
-                result['level'] = 'LLD'
+                result['level'] = 'IMPLEMENTATION'
                 result['component_type'] = 'Function'
                 result['purpose'] = 'Function implementations'
                 result['complexity'] = 'low'
             else:
-                result['level'] = 'LLD'
+                result['level'] = 'IMPLEMENTATION'
                 result['component_type'] = 'File'
                 result['purpose'] = 'Code file with various components'
                 result['complexity'] = 'low'

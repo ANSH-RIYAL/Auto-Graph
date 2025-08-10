@@ -21,7 +21,8 @@ class EnhancedExporter:
     
     def __init__(self):
         self.visualizer = GraphVisualizer()
-        self.export_formats = ['json', 'yaml', 'csv', 'dot', 'html', 'mermaid']
+        # JSON is canonical; other formats are disabled by default (can be re-enabled later)
+        self.export_formats = ['json']
     
     def export_graph(self, graph: Graph, output_dir: str, formats: List[str] = None) -> Dict[str, str]:
         """Export graph in multiple formats."""
@@ -49,30 +50,7 @@ class EnhancedExporter:
                     result = self._export_json(graph, str(output_path))
                     export_results['json'] = str(output_path)
                 
-                elif format_type == 'yaml':
-                    output_path = output_dir / f"autograph_graph_{timestamp}.yaml"
-                    result = self._export_yaml(graph, str(output_path))
-                    export_results['yaml'] = str(output_path)
-                
-                elif format_type == 'csv':
-                    output_path = output_dir / f"autograph_graph_{timestamp}.csv"
-                    result = self._export_csv(graph, str(output_path))
-                    export_results['csv'] = str(output_path)
-                
-                elif format_type == 'dot':
-                    output_path = output_dir / f"autograph_graph_{timestamp}.dot"
-                    result = self.visualizer.generate_dot_visualization(graph, str(output_path))
-                    export_results['dot'] = str(output_path)
-                
-                elif format_type == 'html':
-                    output_path = output_dir / f"autograph_graph_{timestamp}.html"
-                    result = self.visualizer.generate_html_visualization(graph, str(output_path))
-                    export_results['html'] = str(output_path)
-                
-                elif format_type == 'mermaid':
-                    output_path = output_dir / f"autograph_graph_{timestamp}.mmd"
-                    result = self.visualizer.generate_mermaid_visualization(graph, str(output_path))
-                    export_results['mermaid'] = str(output_path)
+                # Other formats intentionally disabled for now
                 
                 logger.info(f"Successfully exported {format_type} to {output_path}")
                 
@@ -226,8 +204,8 @@ class EnhancedExporter:
     
     def _generate_graph_statistics(self, graph: Graph) -> Dict[str, Any]:
         """Generate comprehensive graph statistics."""
-        hld_nodes = [n for n in graph.nodes if n.level == NodeLevel.HLD]
-        lld_nodes = [n for n in graph.nodes if n.level == NodeLevel.LLD]
+        hld_nodes = [n for n in graph.nodes if n.level == NodeLevel.BUSINESS]
+        lld_nodes = [n for n in graph.nodes if n.level == NodeLevel.IMPLEMENTATION]
         
         # Node type distribution
         node_types = {}
@@ -263,16 +241,16 @@ class EnhancedExporter:
     
     def _generate_hierarchical_structure(self, graph: Graph) -> Dict[str, Any]:
         """Generate hierarchical structure analysis."""
-        hld_nodes = [n for n in graph.nodes if n.level == NodeLevel.HLD]
-        lld_nodes = [n for n in graph.nodes if n.level == NodeLevel.LLD]
+        hld_nodes = [n for n in graph.nodes if n.level == NodeLevel.BUSINESS]
+        lld_nodes = [n for n in graph.nodes if n.level == NodeLevel.IMPLEMENTATION]
         
         hierarchy = {
-            'hld_modules': [],
-            'lld_components': [],
+            'business_nodes': [],
+            'implementation_components': [],
             'containment_relationships': []
         }
         
-        # HLD modules
+        # Business nodes
         for node in hld_nodes:
             module_info = {
                 'id': node.id,
@@ -281,9 +259,9 @@ class EnhancedExporter:
                 'child_count': len(node.children),
                 'children': node.children
             }
-            hierarchy['hld_modules'].append(module_info)
+            hierarchy['business_nodes'].append(module_info)
         
-        # LLD components
+        # Implementation components
         for node in lld_nodes:
             component_info = {
                 'id': node.id,
@@ -294,7 +272,7 @@ class EnhancedExporter:
                 'function_count': len(node.functions),
                 'class_count': len(node.classes)
             }
-            hierarchy['lld_components'].append(component_info)
+            hierarchy['implementation_components'].append(component_info)
         
         # Containment relationships
         containment_edges = [e for e in graph.edges if e.type == EdgeType.CONTAINS]
@@ -340,7 +318,7 @@ class EnhancedExporter:
         """Generate complexity analysis."""
         complexity_data = {
             'by_node_type': {},
-            'by_level': {'HLD': [], 'LLD': []},
+            'by_level': {'BUSINESS': [], 'SYSTEM': [], 'IMPLEMENTATION': []},
             'most_complex_nodes': [],
             'complexity_trends': {}
         }

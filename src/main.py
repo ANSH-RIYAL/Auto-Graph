@@ -88,8 +88,8 @@ def display_results(result: dict, verbose: bool):
     table.add_row("Total Files", str(stats['total_files']))
     table.add_row("Successful Parses", str(stats['successful_parses']))
     table.add_row("Coverage Percentage", f"{stats['coverage_percentage']:.1f}%")
-    table.add_row("HLD Nodes", str(stats['hld_nodes']))
-    table.add_row("LLD Nodes", str(stats['lld_nodes']))
+    table.add_row("Business Nodes", str(stats.get('business_nodes', stats.get('hld_nodes', 0))))
+    table.add_row("Implementation Nodes", str(stats.get('implementation_nodes', stats.get('lld_nodes', 0))))
     table.add_row("Total Edges", str(stats['total_edges']))
     
     console.print(table)

@@ -57,7 +57,7 @@ class SemanticAnalyzer:
         # Determine file purpose based on naming patterns and content
         purpose = self._determine_file_purpose(file_name, functions, classes, imports)
         
-        # Determine component level (HLD vs LLD)
+        # Determine component level (Business vs Implementation)
         level = self._determine_component_level(file_name, functions, classes, imports)
         
         # Determine component type
@@ -121,9 +121,9 @@ class SemanticAnalyzer:
     
     def _determine_component_level(self, file_name: str, functions: List[str], 
                                   classes: List[str], imports: List[str]) -> NodeLevel:
-        """Determine if a component is HLD or LLD."""
+        """Determine if a component is BUSINESS or IMPLEMENTATION (SYSTEM added later by clustering)."""
         
-        # HLD indicators
+        # BUSINESS indicators
         hld_indicators = [
             'api', 'route', 'endpoint', 'controller',  # API layer
             'service', 'business', 'logic',            # Service layer
@@ -132,20 +132,20 @@ class SemanticAnalyzer:
             'main', 'app'                              # Main application
         ]
         
-        # Check if file name suggests HLD
+        # Check if file name suggests BUSINESS
         if any(indicator in file_name for indicator in hld_indicators):
-            return NodeLevel.HLD
+            return NodeLevel.BUSINESS
         
-        # Check if file has many functions/classes (suggests LLD)
+        # Check if file has many functions/classes (suggests IMPLEMENTATION)
         if len(functions) > 5 or len(classes) > 2:
-            return NodeLevel.LLD
+            return NodeLevel.IMPLEMENTATION
         
-        # Check if file has utility functions (suggests LLD)
+        # Check if file has utility functions (suggests IMPLEMENTATION)
         if any('util' in func.lower() or 'helper' in func.lower() for func in functions):
-            return NodeLevel.LLD
+            return NodeLevel.IMPLEMENTATION
         
-        # Default to LLD for most files
-        return NodeLevel.LLD
+        # Default to IMPLEMENTATION for most files
+        return NodeLevel.IMPLEMENTATION
     
     def _determine_component_type(self, file_name: str, functions: List[str], 
                                  classes: List[str], imports: List[str]) -> NodeType:
@@ -233,8 +233,15 @@ class SemanticAnalyzer:
         # Convert component type to NodeType enum
         component_type = self._map_component_type(llm_result.get('component_type', 'Function'))
         
-        # Convert level to NodeLevel enum
-        level = NodeLevel.HLD if llm_result.get('level') == 'HLD' else NodeLevel.LLD
+        # Convert level to NodeLevel enum (map legacy values)
+        level_map = {
+            'HLD': NodeLevel.BUSINESS,
+            'LLD': NodeLevel.IMPLEMENTATION,
+            'BUSINESS': NodeLevel.BUSINESS,
+            'SYSTEM': NodeLevel.SYSTEM,
+            'IMPLEMENTATION': NodeLevel.IMPLEMENTATION
+        }
+        level = level_map.get(llm_result.get('level', 'IMPLEMENTATION'), NodeLevel.IMPLEMENTATION)
         
         # Convert complexity to ComplexityLevel enum
         complexity = self._map_complexity(llm_result.get('complexity', 'low'))

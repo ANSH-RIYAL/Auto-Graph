@@ -7,7 +7,7 @@ let selectedNode = null;
 let isProcessing = false;
 let cy = null;
 
-// Color mapping for HLD modules
+// Color mapping for modules
 const moduleColors = {
     'module_service_layer': '#D0021B',
     'module_utilities': '#00BCD4', 
@@ -123,6 +123,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeEventListeners();
     initializeCytoscape();
     addLog('Ready to analyze', 'info');
+    ['filterContains','filterDepends','filterCalls'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', () => displayGraph());
+    });
 });
 
 // Initialize Cytoscape
@@ -207,7 +211,16 @@ function initializeCytoscape() {
                     'text-outline-width': 1,
                     'text-outline-color': 'white',
                     'text-outline-opacity': 0.8,
-                    'opacity': 1
+                    'opacity': 0.2
+                }
+            },
+            {
+                selector: 'edge:selected',
+                style: {
+                    'opacity': 1,
+                    'line-color': '#2c3e50',
+                    'target-arrow-color': '#2c3e50',
+                    'width': 5
                 }
             },
             {
@@ -227,7 +240,7 @@ function initializeCytoscape() {
                     'source-arrow-color': '#e74c3c',
                     'width': 6,
                     'line-style': 'solid',
-                    'opacity': 1
+                    'opacity': 0.2
                 }
             }
         ],
@@ -375,207 +388,48 @@ function displayGraph() {
     
     // Filter nodes by technical depth
     const filteredNodes = currentGraphData.nodes.filter(node => {
-        const nodeDepth = node.metadata?.technical_depth || (node.level === 'HLD' ? 1 : 3);
+        const nodeDepth = node.metadata?.technical_depth || (node.level === 'BUSINESS' ? 1 : (node.level === 'SYSTEM' ? 2 : 3));
         return nodeDepth <= currentDepth;
     });
     
-    if (currentViewMode === 'HIERARCHY') {
-        // Show hierarchical view based on depth
-        if (currentDepth === 1) {
-            // Business level - show only HLD nodes with data flow connections
-            const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
-            hldNodes.forEach((node, index) => {
-                elements.push({
-                    data: {
-                        id: node.id,
-                        label: node.name || node.id,
-                        type: node.type,
-                        level: node.level,
-                        color: node.metadata?.color || moduleColors[node.id] || '#f0f0f0'
-                    },
-                    position: {
-                        x: 200 + (index * 350),
-                        y: 200
-                    }
-                });
-            });
-            
-            // Add data flow connections between HLD modules
-            if (hldNodes.length > 1) {
-                for (let i = 0; i < hldNodes.length; i++) {
-                    for (let j = i + 1; j < hldNodes.length; j++) {
-                        const sourceNode = hldNodes[i];
-                        const targetNode = hldNodes[j];
-                        
-                        // Determine data types based on module types
-                        let dataTypes = getDataFlowTypes(sourceNode, targetNode);
-                        
-                        // Create bidirectional data flow edge
-                        elements.push({
-                            data: {
-                                id: `data-flow-${sourceNode.id}-${targetNode.id}`,
-                                source: sourceNode.id,
-                                target: targetNode.id,
-                                label: dataTypes,
-                                bidirectional: true,
-                                type: 'data_flow',
-                                sourceArrowColor: '#e74c3c',
-                                sourceArrowShape: 'triangle'
-                            }
-                        });
-                    }
-                }
-            }
-        } else {
-            // System/Implementation levels - show hierarchy
-            const hldNodes = filteredNodes.filter(node => node.level === 'HLD');
-            const lldNodes = filteredNodes.filter(node => node.level === 'LLD');
-        
-            // Add HLD nodes at top level
-            hldNodes.forEach((node, index) => {
-                elements.push({
-                    data: {
-                        id: node.id,
-                        label: node.name || node.id,
-                        type: node.type,
-                        level: node.level,
-                        color: node.metadata?.color || moduleColors[node.id] || '#f0f0f0'
-                    },
-                    position: {
-                        x: 200 + (index * 400),
-                        y: 100
-                    }
-                });
-            });
-        
-            // Group LLD nodes by parent module and position them below
-            const moduleGroups = {};
-            
-            lldNodes.forEach(node => {
-                const parentModule = getNodeParentModule(node);
-                const parentColor = node.metadata?.color || moduleColors[parentModule] || '#f0f0f0';
-                
-                if (!moduleGroups[parentModule]) {
-                    moduleGroups[parentModule] = [];
-                }
-                
-                moduleGroups[parentModule].push({
-                    data: {
-                        id: node.id,
-                        label: node.name || node.id,
-                        type: node.type,
-                        level: node.level,
-                        color: parentColor,
-                        parent: parentModule
-                    }
-                });
-            });
-            
-            // Position LLD nodes in columns under their parent modules
-            Object.keys(moduleGroups).forEach((moduleId, moduleIndex) => {
-                const group = moduleGroups[moduleId];
-                group.forEach((node, nodeIndex) => {
-                    node.position = {
-                        x: 150 + (moduleIndex * 400) + ((nodeIndex % 2) * 100),
-                        y: 250 + (Math.floor(nodeIndex / 2) * 120)
-                    };
-                    elements.push(node);
-                });
-            });
-            
-            // Add hierarchy edges from HLD to LLD (only at depth 2+)
-            if (currentDepth >= 2) {
-                lldNodes.forEach(lldNode => {
-                    const parentModule = getNodeParentModule(lldNode);
-                    elements.push({
-                        data: {
-                            id: `hierarchy-${parentModule}-${lldNode.id}`,
-                            source: parentModule,
-                            target: lldNode.id
-                        }
-                    });
-                });
-            }
-        }
-    } else if (currentViewMode === 'CONNECTIONS') {
-        // Show all filtered nodes with full connection view
-        filteredNodes.forEach(node => {
-            const parentModule = getNodeParentModule(node);
-            const nodeColor = node.metadata?.color || moduleColors[node.id] || moduleColors[parentModule] || '#f0f0f0';
-            
-            elements.push({
-                data: {
-                    id: node.id,
-                    label: node.name || node.id,
-                    type: node.type,
-                    level: node.level,
-                    color: nodeColor
-                }
-            });
+    // Single deterministic rendering path: always use server-provided positions
+    filteredNodes.forEach(node => {
+        const nodeColor = node.metadata?.color || moduleColors[node.id] || '#f0f0f0';
+        elements.push({
+            data: {
+                id: node.id,
+                label: node.name || node.id,
+                type: node.type,
+                level: node.level,
+                color: nodeColor
+            },
+            position: node.position || { x: 0, y: 0 }
         });
-        
-        // Add edges with bidirectional arrows and communication labels
-        const addedEdges = new Set();
-        const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
-        
-        currentGraphData.edges.forEach(edge => {
-            // Only show edges between filtered nodes
-            if (!filteredNodeIds.has(edge.from_node) || !filteredNodeIds.has(edge.to_node)) {
-                return;
-            }
-            
-            const edgeKey = `${edge.from_node}-${edge.to_node}`;
-            const reverseKey = `${edge.to_node}-${edge.from_node}`;
-            
-            if (!addedEdges.has(edgeKey) && !addedEdges.has(reverseKey)) {
-                const isBidirectional = edge.metadata?.bidirectional === true;
-                const commType = edge.metadata?.communication_type || edge.metadata?.relationship_type || edge.type || '';
-                
-                elements.push({
-                    data: {
-                        id: edge.id || edgeKey,
-                        source: edge.from_node,
-                        target: edge.to_node,
-                        label: commType,
-                        bidirectional: isBidirectional,
-                        sourceArrowColor: isBidirectional ? '#666666' : 'transparent',
-                        sourceArrowShape: isBidirectional ? 'triangle' : 'none'
-                    }
-                });
-                addedEdges.add(edgeKey);
+    });
+
+    const visible = new Set(filteredNodes.map(n => n.id));
+    currentGraphData.edges.forEach(edge => {
+        if (!visible.has(edge.from_node) || !visible.has(edge.to_node)) return;
+        const edgeKey = edge.id || `${edge.from_node}-${edge.to_node}`;
+        elements.push({
+            data: {
+                id: edgeKey,
+                source: edge.from_node,
+                target: edge.to_node,
+                label: edge.metadata?.relationship_type || edge.type || ''
             }
         });
-    }
+    });
     
     // Update graph
     cy.elements().remove();
     cy.add(elements);
     
-    // Choose layout based on view mode
-    if (currentViewMode === 'HIERARCHY') {
-        // Use preset layout since we're setting positions manually
-        cy.layout({
-            name: 'preset',
-            padding: 50
-        }).run();
-    } else {
-        // Use force-directed layout for connections view
-        cy.layout({
-            name: 'cose',
-            idealEdgeLength: 120,
-            nodeOverlap: 30,
-            refresh: 20,
-            fit: true,
-            padding: 50,
-            randomize: false,
-            componentSpacing: 150,
-            nodeRepulsion: 400000,
-            edgeElasticity: 100,
-            nestingFactor: 5,
-            gravity: 80,
-            numIter: 1000
-        }).run();
-    }
+    // Always use preset layout; positions are computed server-side for determinism
+    cy.layout({
+        name: 'preset',
+        padding: 50
+    }).run();
     
     setTimeout(() => cy.fit(), 300);
     
@@ -654,23 +508,25 @@ function handleDrop(e) {
     
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-        handleFile(files[0]);
+        handleFiles(Array.from(files));
     }
 }
 
 function handleFileSelect(e) {
     const files = e.target.files;
     if (files.length > 0) {
-        handleFile(files[0]);
+        handleFiles(Array.from(files));
     }
 }
 
-function handleFile(file) {
-    if (file.type === 'application/zip' || file.name.endsWith('.zip')) {
-        uploadFile(file);
-    } else {
-        addLog('Please select a ZIP file', 'error');
+async function handleFiles(files) {
+    // If a directory was dropped via webkitdirectory, package it into a zip in-browser is complex.
+    // Here we accept either a single zip OR a directory selection and send as FormData with multiple files.
+    if (files.length === 1 && (files[0].type === 'application/zip' || files[0].name.endsWith('.zip'))) {
+        await uploadZip(files[0]);
+        return;
     }
+    await uploadDirectory(files);
 }
 
 // Analysis handling
@@ -683,7 +539,7 @@ async function handleAnalyze() {
             addLog('Please select a file to analyze', 'error');
             return;
         }
-        await uploadFile(files[0]);
+        await handleFiles(Array.from(files));
     } else if (activeTab === 'github') {
         const url = elements.githubUrl.value.trim();
         const branch = elements.githubBranch.value.trim() || 'main';
@@ -696,12 +552,12 @@ async function handleAnalyze() {
     }
 }
 
-async function uploadFile(file) {
+async function uploadZip(file) {
     if (isProcessing) return;
     
     isProcessing = true;
     updateAnalyzeButton();
-    showStatus('Uploading file...');
+    showStatus('Uploading zip...');
     
     const formData = new FormData();
     formData.append('file', file);
@@ -723,6 +579,39 @@ async function uploadFile(file) {
         }
     } catch (error) {
         addLog(`Upload failed: ${error.message}`, 'error');
+        hideStatus();
+    } finally {
+        isProcessing = false;
+        updateAnalyzeButton();
+    }
+}
+
+async function uploadDirectory(files) {
+    if (isProcessing) return;
+    isProcessing = true;
+    updateAnalyzeButton();
+    showStatus('Uploading folder (multiple files)...');
+
+    const formData = new FormData();
+    for (const file of files) {
+        formData.append('files', file, file.webkitRelativePath || file.name);
+    }
+
+    try {
+        const response = await fetch('/api/analysis/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        if (result.success) {
+            currentAnalysisId = result.analysisId;
+            addLog('Folder uploaded successfully, starting analysis...', 'success');
+            pollAnalysisStatus();
+        } else {
+            throw new Error(result.error || 'Upload failed');
+        }
+    } catch (error) {
+        addLog(`Folder upload failed: ${error.message}`, 'error');
         hideStatus();
     } finally {
         isProcessing = false;
@@ -925,8 +814,8 @@ function updateStatistics(data) {
     const stats = data.statistics;
     elements.filesAnalyzed.textContent = stats.total_files || 0;
     elements.coveragePercent.textContent = `${(stats.coverage_percentage || 0).toFixed(1)}%`;
-    elements.hldNodes.textContent = stats.hld_nodes || 0;
-    elements.lldNodes.textContent = stats.lld_nodes || 0;
+    elements.hldNodes.textContent = stats.business_nodes || stats.hld_nodes || 0;
+    elements.lldNodes.textContent = stats.implementation_nodes || stats.lld_nodes || 0;
     elements.totalEdges.textContent = stats.total_edges || 0;
     
     elements.statsSection.style.display = 'block';

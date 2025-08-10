@@ -9,7 +9,7 @@ from datetime import datetime
 from ..utils.logger import get_logger
 from ..utils.file_utils import FileUtils
 from ..parser.file_parser import FileParser
-from ..models.schemas import Graph, GraphMetadata, GraphNode, GraphEdge, NodeLevel, NodeType, EdgeType, ComplexityLevel
+from ..models.schemas import Graph, GraphMetadata, GraphNode, GraphEdge, NodeLevel, NodeType, EdgeType, ComplexityLevel, TechnicalDepth
 from ..models.graph_models import GraphBuilder, FileCategorizer
 from ..graph_builder.enhanced_graph_builder import EnhancedGraphBuilder
 from ..export.enhanced_exporter import EnhancedExporter
@@ -51,8 +51,8 @@ class CodebaseAnalyzer:
             validation_issues = self.graph_builder.validate_graph()
             if validation_issues:
                 logger.log_graph_validation(validation_issues)
-            
-            # Step 4: Export graph in multiple formats
+
+            # Step 4: Export graph (JSON only)
             export_results = self._export_analysis_results(graph, codebase_path)
             
             # Step 5: Generate final result with enhanced statistics
@@ -73,11 +73,9 @@ class CodebaseAnalyzer:
         # Create graph metadata
         metadata = self._create_graph_metadata(codebase_path, parsing_result)
         
-        # Create HLD nodes (modules, services, etc.)
-        hld_nodes = self._create_hld_nodes(parsing_result)
-        
-        # Create LLD nodes (functions, classes, etc.)
-        lld_nodes = self._create_lld_nodes(parsing_result)
+        # Create BUSINESS/SYSTEM/IMPLEMENTATION nodes
+        hld_nodes = self._create_business_nodes(parsing_result)
+        lld_nodes = self._create_implementation_nodes(parsing_result)
         
         # Create edges between nodes
         edges = self._create_graph_edges(parsing_result, hld_nodes, lld_nodes)
@@ -89,7 +87,7 @@ class CodebaseAnalyzer:
             edges=edges
         )
         
-        logger.info(f"Graph built: {len(hld_nodes)} HLD nodes, {len(lld_nodes)} LLD nodes, {len(edges)} edges")
+        logger.info(f"Graph built: {len(hld_nodes)} BUSINESS nodes, {len(lld_nodes)} IMPLEMENTATION nodes, {len(edges)} edges")
         return graph
     
     def _create_graph_metadata(self, codebase_path: str, parsing_result: Dict[str, Any]) -> GraphMetadata:
@@ -106,8 +104,8 @@ class CodebaseAnalyzer:
             categories=stats['categories']
         )
     
-    def _create_hld_nodes(self, parsing_result: Dict[str, Any]) -> Dict[str, GraphNode]:
-        """Create High-Level Design nodes."""
+    def _create_business_nodes(self, parsing_result: Dict[str, Any]) -> Dict[str, GraphNode]:
+        """Create Business-level nodes (formerly HLD)."""
         hld_nodes = {}
         
         # Group files by category to create HLD nodes
@@ -130,7 +128,7 @@ class CodebaseAnalyzer:
                     id=node_id,
                     name=f"{category.title()} Module",
                     type=NodeType.MODULE,
-                    level=NodeLevel.HLD,
+                    level=NodeLevel.BUSINESS,
                     files=files,
                     metadata=self._create_node_metadata(files, parsing_result)
                 )
@@ -138,7 +136,7 @@ class CodebaseAnalyzer:
         return hld_nodes
     
     def _create_backend_hld_nodes(self, files: List[str], parsing_result: Dict[str, Any], hld_nodes: Dict[str, GraphNode]) -> None:
-        """Create specialized HLD nodes for backend components."""
+        """Create specialized Business nodes for backend components."""
         # Group backend files by their purpose
         api_files = []
         service_files = []
@@ -162,7 +160,7 @@ class CodebaseAnalyzer:
                 id='module_api',
                 name='API Layer',
                 type=NodeType.API,
-                level=NodeLevel.HLD,
+                level=NodeLevel.BUSINESS,
                 files=api_files,
                 metadata=self._create_node_metadata(api_files, parsing_result)
             )
@@ -172,7 +170,7 @@ class CodebaseAnalyzer:
                 id='module_service',
                 name='Service Layer',
                 type=NodeType.SERVICE,
-                level=NodeLevel.HLD,
+                level=NodeLevel.BUSINESS,
                 files=service_files,
                 metadata=self._create_node_metadata(service_files, parsing_result)
             )
@@ -182,7 +180,7 @@ class CodebaseAnalyzer:
                 id='module_model',
                 name='Data Models',
                 type=NodeType.MODEL,
-                level=NodeLevel.HLD,
+                level=NodeLevel.BUSINESS,
                 files=model_files,
                 metadata=self._create_node_metadata(model_files, parsing_result)
             )
@@ -192,13 +190,13 @@ class CodebaseAnalyzer:
                 id='module_utility',
                 name='Utilities',
                 type=NodeType.UTILITY,
-                level=NodeLevel.HLD,
+                level=NodeLevel.BUSINESS,
                 files=utility_files,
                 metadata=self._create_node_metadata(utility_files, parsing_result)
             )
     
-    def _create_lld_nodes(self, parsing_result: Dict[str, Any]) -> Dict[str, GraphNode]:
-        """Create Low-Level Design nodes."""
+    def _create_implementation_nodes(self, parsing_result: Dict[str, Any]) -> Dict[str, GraphNode]:
+        """Create Implementation-level nodes (formerly LLD)."""
         lld_nodes = {}
         
         for file_path, file_data in parsing_result['parsed_files'].items():
@@ -209,7 +207,7 @@ class CodebaseAnalyzer:
                     id=node_id,
                     name=func_name,
                     type=NodeType.FUNCTION,
-                    level=NodeLevel.LLD,
+                    level=NodeLevel.IMPLEMENTATION,
                     files=[file_path],
                     functions=[func_name],
                     metadata=self._create_function_metadata(func_name, file_path, parsing_result)
@@ -222,7 +220,7 @@ class CodebaseAnalyzer:
                     id=node_id,
                     name=class_name,
                     type=NodeType.CLASS,
-                    level=NodeLevel.LLD,
+                    level=NodeLevel.IMPLEMENTATION,
                     files=[file_path],
                     classes=[class_name],
                     metadata=self._create_class_metadata(class_name, file_path, parsing_result)
@@ -234,10 +232,10 @@ class CodebaseAnalyzer:
         """Create edges between nodes."""
         edges = []
         
-        # Create containment edges (HLD contains LLD)
+        # Create containment edges (BUSINESS contains IMPLEMENTATION)
         for lld_node in lld_nodes.values():
             for file_path in lld_node.files:
-                # Find parent HLD node
+                # Find parent BUSINESS node
                 parent_hld = self._find_parent_hld_node(file_path, hld_nodes)
                 if parent_hld:
                     edges.append(GraphEdge(
@@ -256,7 +254,7 @@ class CodebaseAnalyzer:
         return edges
     
     def _find_parent_hld_node(self, file_path: str, hld_nodes: Dict[str, GraphNode]) -> Optional[GraphNode]:
-        """Find the HLD node that contains a given file."""
+        """Find the BUSINESS node that contains a given file."""
         for hld_node in hld_nodes.values():
             if file_path in hld_node.files:
                 return hld_node
@@ -290,7 +288,8 @@ class CodebaseAnalyzer:
             'line_count': total_lines,
             'file_size': total_size,
             'language': 'python',
-            'category': 'backend'
+            'category': 'backend',
+            'technical_depth': TechnicalDepth.SYSTEM
         }
     
     def _create_function_metadata(self, func_name: str, file_path: str, parsing_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -391,8 +390,8 @@ class CodebaseAnalyzer:
                 'total_files': parsing_result['parsing_stats']['total_files'],
                 'successful_parses': parsing_result['parsing_stats']['successful_parses'],
                 'coverage_percentage': parsing_result['parsing_stats']['coverage_percentage'],
-                'hld_nodes': len([n for n in graph.nodes if n.level == NodeLevel.HLD]),
-                'lld_nodes': len([n for n in graph.nodes if n.level == NodeLevel.LLD]),
+                'business_nodes': len([n for n in graph.nodes if n.level == NodeLevel.BUSINESS]),
+                'implementation_nodes': len([n for n in graph.nodes if n.level == NodeLevel.IMPLEMENTATION]),
                 'total_edges': len(graph.edges),
                 'semantic_analysis': enhanced_stats['semantic_analysis'],
                 'relationship_mapping': enhanced_stats['relationship_mapping'],

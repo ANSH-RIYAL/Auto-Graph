@@ -74,7 +74,7 @@ def convert_analysis_result_to_frontend_format(analysis_result):
                 "language": node_metadata.language if node_metadata else 'unknown',
                 "category": node_metadata.category if node_metadata else 'other',
                 # Enhanced metadata
-                "technical_depth": node_metadata.technical_depth if node_metadata else (1 if node.level.value == 'HLD' else 3),
+                "technical_depth": node_metadata.technical_depth if node_metadata else (1 if node.level.value == 'BUSINESS' else (2 if node.level.value == 'SYSTEM' else 3)),
                 "color": node_metadata.color if node_metadata else None,
                 "size": node_metadata.size if node_metadata else None,
                 "agent_touched": node_metadata.agent_touched if node_metadata else False,
@@ -132,17 +132,18 @@ def convert_analysis_result_to_frontend_format(analysis_result):
         "languages": graph_metadata.languages if graph_metadata else [],
         "categories": graph_metadata.categories if graph_metadata else {},
         # Enhanced statistics
-        "statistics": {
-            "total_nodes": graph_metadata.statistics.total_nodes if graph_metadata and graph_metadata.statistics else len(nodes),
-            "hld_nodes": graph_metadata.statistics.hld_nodes if graph_metadata and graph_metadata.statistics else len([n for n in nodes if n['level'] == 'HLD']),
-            "lld_nodes": graph_metadata.statistics.lld_nodes if graph_metadata and graph_metadata.statistics else len([n for n in nodes if n['level'] == 'LLD']),
-            "total_edges": graph_metadata.statistics.total_edges if graph_metadata and graph_metadata.statistics else len(edges),
-            "technical_depths": graph_metadata.statistics.technical_depths if graph_metadata and graph_metadata.statistics else {
-                "business": len([n for n in nodes if n['metadata']['technical_depth'] == 1]),
-                "system": len([n for n in nodes if n['metadata']['technical_depth'] == 2]),
-                "implementation": len([n for n in nodes if n['metadata']['technical_depth'] == 3])
-            }
-        },
+            "statistics": {
+                "total_nodes": graph_metadata.statistics.total_nodes if graph_metadata and graph_metadata.statistics else len(nodes),
+                "business_nodes": getattr(graph_metadata.statistics, 'business_nodes', 0) or len([n for n in nodes if n['level'] == 'BUSINESS']),
+                "system_nodes": getattr(graph_metadata.statistics, 'system_nodes', 0) or len([n for n in nodes if n['level'] == 'SYSTEM']),
+                "implementation_nodes": getattr(graph_metadata.statistics, 'implementation_nodes', 0) or len([n for n in nodes if n['level'] == 'IMPLEMENTATION']),
+                "total_edges": graph_metadata.statistics.total_edges if graph_metadata and graph_metadata.statistics else len(edges),
+                "technical_depths": graph_metadata.statistics.technical_depths if graph_metadata and graph_metadata.statistics else {
+                    "business": len([n for n in nodes if n['metadata']['technical_depth'] == 1]),
+                    "system": len([n for n in nodes if n['metadata']['technical_depth'] == 2]),
+                    "implementation": len([n for n in nodes if n['metadata']['technical_depth'] == 3])
+                }
+            },
         # PM metrics
         "pm_metrics": {
             "development_velocity": graph_metadata.pm_metrics.development_velocity if graph_metadata and graph_metadata.pm_metrics else "medium",
@@ -153,6 +154,60 @@ def convert_analysis_result_to_frontend_format(analysis_result):
         } if graph_metadata and graph_metadata.pm_metrics else None
     }
     
+    # Compute stable positions (zoned layout) on the server for deterministic views
+    try:
+        # Organize nodes by level
+        business_nodes = [n for n in nodes if n['level'] == 'BUSINESS']
+        system_nodes = [n for n in nodes if n['level'] == 'SYSTEM']
+        impl_nodes = [n for n in nodes if n['level'] == 'IMPLEMENTATION']
+
+        # Map of parent relationships from edges
+        parent_of = {e['to_node']: e['from_node'] for e in edges if e['type'] == 'contains'}
+
+        # Sort business nodes for deterministic ordering
+        business_nodes.sort(key=lambda n: n['name'])
+        column_spacing = 350
+        row_y = {1: 150, 2: 350, 3: 550}
+
+        # Assign positions for business nodes
+        business_x = {}
+        for idx, bn in enumerate(business_nodes):
+            x = 200 + idx * column_spacing
+            bn['position'] = {"x": x, "y": row_y[1]}
+            business_x[bn['id']] = x
+
+        # Group system nodes under business parents
+        sys_by_parent = {}
+        for sn in system_nodes:
+            parent = parent_of.get(sn['id'])
+            sys_by_parent.setdefault(parent, []).append(sn)
+
+        for parent, group in sys_by_parent.items():
+            group.sort(key=lambda n: n['name'])
+            px = business_x.get(parent, 200)
+            count = len(group)
+            for j, sn in enumerate(group):
+                offset = (j - (count - 1) / 2.0) * 160
+                sn['position'] = {"x": px + offset, "y": row_y[2]}
+
+        # Group implementation nodes under system (fallback to business if no system parent)
+        impl_by_parent = {}
+        for inn in impl_nodes:
+            parent = parent_of.get(inn['id'])
+            impl_by_parent.setdefault(parent, []).append(inn)
+
+        system_x = {n['id']: n['position']['x'] for n in system_nodes if 'position' in n}
+        for parent, group in impl_by_parent.items():
+            group.sort(key=lambda n: n['name'] if n['name'] else n['id'])
+            px = system_x.get(parent, business_x.get(parent, 200))
+            count = len(group)
+            for k, inn in enumerate(group):
+                offset = (k - (count - 1) / 2.0) * 120
+                inn['position'] = {"x": px + offset, "y": row_y[3]}
+    except Exception as _:
+        # If anything fails, keep zero positions and let client layout fallback
+        pass
+
     return {
         "metadata": metadata,
         "nodes": nodes,
@@ -167,12 +222,16 @@ def index():
 def upload_analysis():
     """Handle file upload for analysis"""
     try:
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
+        # Accept either a single 'file' (zip) or multiple 'files' (folder upload)
+        upload_files = []
+        if 'file' in request.files and request.files['file'].filename:
+            upload_files = [request.files['file']]
+        elif 'files' in request.files:
+            upload_files = request.files.getlist('files')
+            if not upload_files:
+                return jsonify({'error': 'No files provided'}), 400
+        else:
+            return jsonify({'error': 'No file(s) provided'}), 400
         
         # Generate analysis ID
         analysis_id = str(uuid.uuid4())
@@ -180,16 +239,17 @@ def upload_analysis():
         # Create temporary directory for uploaded files
         temp_dir = tempfile.mkdtemp()
         
-        # Save uploaded file
-        file_path = os.path.join(temp_dir, file.filename)
-        file.save(file_path)
-        
-        # Extract if it's a zip file
-        if file.filename.endswith('.zip'):
-            with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                zip_ref.extractall(temp_dir)
-            # Remove the zip file
-            os.remove(file_path)
+        # Save uploaded files
+        for f in upload_files:
+            dst_path = os.path.join(temp_dir, f.filename)
+            # Ensure parent directory exists for folder uploads
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            f.save(dst_path)
+            # Extract zip archives
+            if f.filename.endswith('.zip'):
+                with zipfile.ZipFile(dst_path, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+                os.remove(dst_path)
         
         # Initialize analysis session
         analysis_sessions[analysis_id] = {

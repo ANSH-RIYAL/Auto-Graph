@@ -10,9 +10,10 @@ from datetime import datetime
 
 
 class NodeLevel(str, Enum):
-    """Enumeration for node levels in the hierarchical graph."""
-    HLD = "HLD"  # High-Level Design
-    LLD = "LLD"  # Low-Level Design
+    """Enumeration for node levels in the hierarchical graph (BSI)."""
+    BUSINESS = "BUSINESS"
+    SYSTEM = "SYSTEM"
+    IMPLEMENTATION = "IMPLEMENTATION"
 
 
 class NodeType(str, Enum):
@@ -56,10 +57,10 @@ class ComplexityLevel(str, Enum):
 
 
 class TechnicalDepth(int, Enum):
-    """Enumeration for technical depth levels."""
-    BUSINESS = 1  # Business view (HLD only)
-    SYSTEM = 2    # System view (HLD + key LLD)
-    IMPLEMENTATION = 3  # Full implementation view (HLD + all LLD)
+    """Enumeration for technical depth levels (1=Business, 2=System, 3=Implementation)."""
+    BUSINESS = 1
+    SYSTEM = 2
+    IMPLEMENTATION = 3
 
 
 class RiskLevel(str, Enum):
@@ -120,7 +121,7 @@ class GraphNode(BaseModel):
     id: str = Field(..., description="Unique identifier for the node")
     name: str = Field(..., description="Human-readable name")
     type: NodeType = Field(..., description="Type of the node")
-    level: NodeLevel = Field(..., description="Level in the hierarchy (HLD/LLD)")
+    level: NodeLevel = Field(..., description="Level in the hierarchy (BUSINESS/SYSTEM/IMPLEMENTATION)")
     
     # File information
     files: List[str] = Field(default_factory=list, description="List of file paths")
@@ -161,8 +162,13 @@ class PMMetrics(BaseModel):
 class GraphStatistics(BaseModel):
     """Statistics about the graph."""
     total_nodes: int = Field(0, description="Total number of nodes")
-    hld_nodes: int = Field(0, description="Number of HLD nodes")
-    lld_nodes: int = Field(0, description="Number of LLD nodes")
+    # Backward-compat fields (kept but not primary)
+    hld_nodes: int = Field(0, description="Legacy: Number of HLD nodes")
+    lld_nodes: int = Field(0, description="Legacy: Number of LLD nodes")
+    # BSI counts
+    business_nodes: int = Field(0, description="Number of BUSINESS nodes")
+    system_nodes: int = Field(0, description="Number of SYSTEM nodes")
+    implementation_nodes: int = Field(0, description="Number of IMPLEMENTATION nodes")
     total_edges: int = Field(0, description="Total number of edges")
     technical_depths: Dict[str, int] = Field(default_factory=dict, description="Nodes by technical depth")
 

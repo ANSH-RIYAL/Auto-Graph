@@ -146,13 +146,13 @@ class GraphBuilder:
     
     def get_statistics(self) -> Dict[str, any]:
         """Get statistics about the graph."""
-        hld_nodes = self.get_nodes_by_level(NodeLevel.HLD)
-        lld_nodes = self.get_nodes_by_level(NodeLevel.LLD)
+        hld_nodes = self.get_nodes_by_level(NodeLevel.BUSINESS)
+        lld_nodes = self.get_nodes_by_level(NodeLevel.IMPLEMENTATION)
         
         return {
             "total_nodes": len(self.nodes),
-            "hld_nodes": len(hld_nodes),
-            "lld_nodes": len(lld_nodes),
+            "business_nodes": len(hld_nodes),
+            "implementation_nodes": len(lld_nodes),
             "total_edges": len(self.edges),
             "node_types": {node_type.value: len(self.get_nodes_by_type(node_type)) 
                           for node_type in NodeType},
