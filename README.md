@@ -1,10 +1,10 @@
-# AutoGraph – Enterprise AI Observability & Codebase Analysis Platform
+# AutoGraph – Unified Codebase Graph (BSI) & Visualization
 
 ## Overview
 AutoGraph transforms complex codebases into actionable business intelligence. It automatically analyzes any codebase and generates comprehensive architecture maps with AI component detection, risk assessment, and compliance reporting - making technical complexity accessible to business stakeholders. **Particularly powerful for fintech systems requiring explainability, transparency, and regulatory compliance.**
 
 ## Project Status
-Currently in **Phase 5: Advanced Integration** - Enhanced visualization and enterprise compliance features 🔄
+Currently in **Phase 1–2 (BSI core + clustering)** – single canonical JSON graph, deterministic layout, UI filters.
 
 ## Key Business Value
 - **AI Component Detection**: Automatically identifies and assesses AI/ML components in codebases
@@ -12,7 +12,7 @@ Currently in **Phase 5: Advanced Integration** - Enhanced visualization and ente
 - **Compliance Reporting**: Generates enterprise-ready reports for SOC2, HIPAA, GDPR, SOX, and PCI
 - **Business Context**: Provides PM-friendly metrics including business value, development status, and stakeholder priorities
 - **Real-time Analysis**: Live progress tracking with drag-and-drop interface
-- **Multi-format Export**: 6 different output formats for different stakeholder needs
+- **JSON Export** only (others deferred)
 
 ## Installation
 ```bash
@@ -68,14 +68,11 @@ vc-one/
 └── examples/                    # Sample codebases for testing
 ```
 
-## Development Phases
-- **Phase 1**: Foundation - Basic parsing and symbol extraction ✅
-- **Phase 2**: Analysis Engine - LLM integration and semantic analysis ✅
-- **Phase 3**: Graph Builder - Hierarchical graph construction ✅
-- **Phase 4**: Web Integration - Flask web application ✅
-- **Phase 5**: Advanced Graph Integration - HLD-LLD connection visualization 🔄
-- **Phase 6**: Enhanced Visualization - Professional graph rendering
-- **Phase 7**: Mobile and Accessibility - Mobile-friendly interface
+## Development Phases (BSI)
+- Phase 1: BSI schema + UI alignment (current)
+- Phase 2: System clustering + depends_on rollups
+- Phase 3: Visual polish (bounding boxes, grid-snap), optional metrics
+- Phase 4: UX extras and optional exports
 
 ## Business Impact & Performance
 
@@ -171,14 +168,8 @@ python run_web.py
 # Then upload a sample codebase in the browser
 ```
 
-## Export Formats
-AutoGraph supports multiple export formats:
-- **JSON**: Structured data for programmatic access
-- **YAML**: Human-readable configuration format
-- **CSV**: Tabular data for analysis tools
-- **DOT**: Graphviz-compatible format
-- **HTML**: Web-based interactive viewer
-- **Mermaid**: Markdown-compatible diagrams
+## Export
+- **JSON** (canonical)
 
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.

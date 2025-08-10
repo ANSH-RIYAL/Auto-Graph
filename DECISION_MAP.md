@@ -6,7 +6,7 @@ Status legend: Implemented | In-Progress | Planned | Deferred
 
 ## Invariants (do not change)
 - Response shape: `{ success, data, error }` (Implemented)
-- Endpoints: `/api/analysis/upload`, `/api/analysis/<id>/status`, `/api/analysis/<id>/result`, `/api/analysis/<id>/export` (Implemented)
+- Endpoints: `/api/analysis/upload`, `/api/analysis/<id>/status`, `/api/analysis/<id>/graph`, `/api/analysis/<id>/logs`, `/api/download/<format>` (Implemented)
 - Leveling terms: Business/System/Implementation only; map legacy HLD→BUSINESS, LLD→IMPLEMENTATION (Implemented)
 
 ## Schema and Core Graph
@@ -14,15 +14,18 @@ Status legend: Implemented | In-Progress | Planned | Deferred
 - Edge types limited to `contains`, `depends_on`, `calls` (Implemented; UI filters wired, back-end rollups for depends_on slated)
 - Backward compatibility mapping from legacy graphs at load time (Implemented)
 - JSON export only in current phase; alternate exports are optional later (Implemented → Planned for reintroduction)
+ - Entity taxonomy introduced (Planned): External_API, LLM_Service, Auth_Provider, User, Managed_DB as external stubs when referenced but not present in repo
 
 ## Backend Pipeline
 - AST parsing to extract files/functions/classes/imports (Implemented)
-- Deterministic positions emitted server-side: BUSINESS y=150, SYSTEM y=330, IMPLEMENTATION y=510; positions persisted in node `position` (Implemented)
+- Deterministic positions emitted server-side: 6 rows (BUSINESS: 150/230, SYSTEM: 310/390, IMPLEMENTATION: 470/550); positions persisted in node `position` (Implemented)
 - Depends-on rollups from imports at SYSTEM level (Planned)
 - System clustering via static import graph and NetworkX greedy modularity (Planned)
 - Business aggregation over System clusters with optional LLM label (Planned)
 - Radon complexity metrics enrichment (Deferred/Optional)
 - Optional call graph ingestion (pyan) with DOT import path (Deferred/Optional)
+ - In-layer x-ordering by degree centrality (Planned)
+ - Coverage metric: % of implementation files assigned + outward edges (Planned)
 
 ## Web UI/Interaction
 - Single-page flow: upload → progress → results → export (Implemented)
@@ -32,7 +35,8 @@ Status legend: Implemented | In-Progress | Planned | Deferred
 - Node-centric highlighting: clicking a node highlights incident edges; clicking edge opens detail panel (Implemented)
 - Clear selection on background click (Implemented)
 - Tiny legend for edge colors/types (Planned)
-- Folder uploads via `webkitdirectory` + multi-file FormData (Planned)
+- Folder uploads via `webkitdirectory` + multi-file FormData (Implemented)
+ - No side features until core complete: exports beyond JSON, dashboards, compliance, search (Deferred)
 
 ## Documentation
 - `PROJECT_PLAN.md` drives phases; BSI terms used consistently (Implemented)

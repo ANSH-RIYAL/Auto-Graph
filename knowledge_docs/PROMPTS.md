@@ -17,6 +17,14 @@
 - **Outputs**: Accessible UI; graceful errors; no renames of IDs/paths.
 
 ### ChatGPT (Docs/Prompts)
+## Visualization-Graph Conversion Prompt (LLM)
+
+System (prepend):
+"You convert an AST graph into a standardized visualization-graph. Do not invent edges or nodes that are not traceable. You may rename, summarize, and fill kind_specific fields. Keep positions and edges unchanged. Output JSON ONLY conforming to the schema. Temperature 0.1."
+
+User (template to fill):
+"Schema:\n<PASTE SCHEMA>\n\nInitial viz draft (immutable edges/positions):\n<PASTE INITIAL VIZ JSON>\n\nTask: Improve naming, summaries, responsibilities, interfaces, domain_tags, and kind_specific fields. Do not alter edges, ids, or positions."
+
 - **Goal**: Keep docs skimmable; update Decision Log when choices change.
 - **Respect**: Invariants; avoid proposing out-of-scope tech.
 - **Outputs**: Minimal edits with clear bullets; no large rewrites.

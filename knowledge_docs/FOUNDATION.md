@@ -16,7 +16,7 @@
 
 ## Invariants (Do Not Change)
 - **Response schema**: `{ success, data, error }` for all JSON endpoints.
-- **Endpoints**: `/api/analysis/upload`, `/api/analysis/<id>/status`, `/api/analysis/<id>/result`, `/api/analysis/<id>/export`.
+- **Endpoints**: `/api/analysis/upload`, `/api/analysis/<id>/status`, `/api/analysis/<id>/graph`, `/api/analysis/<id>/logs`, `/api/download/<format>`.
 - **Progress**: Polling-based status updates (no WebSockets).
 - **LLM Access**: Single client with retries, backoff, caching, and fallback.
 - **Directory Names**: Keep established module folders and file names stable.
@@ -43,9 +43,8 @@ Use `YYYY-MM | Decision | Why | Status(Immutable/Tentative)`
 ## Output Goals
 - **Codebase Analysis**: Unified Business/System/Implementation graph with metadata.
 - **Edge Types**: `contains`, `depends_on`, `calls` (data_flow optional later).
-- **Agent Detection**: Pattern recognition of common AI libraries with risk tagging.
-- **Exports**: JSON, YAML, CSV, DOT, HTML, Mermaid.
 - **UX**: Upload → progress → results → export, in one page with Level/Edge filters.
+- **Interaction Rules**: Node-centric highlighting; edge labels hidden until highlighted; color-coded edge types (contains=green, depends_on=blue dashed, calls=orange dotted).
 
 ## Canonical Graph Principles
 - Each node has `level ∈ {BUSINESS, SYSTEM, IMPLEMENTATION}` and `technical_depth ∈ {1,2,3}`.

@@ -169,14 +169,15 @@ def convert_analysis_result_to_frontend_format(analysis_result):
         # Sort business nodes for deterministic ordering
         business_nodes.sort(key=lambda n: n['name'])
         column_spacing = 350
-        # Add more vertical layers to reduce overlap risk
-        row_y = {1: 150, 2: 330, 3: 510}
+        # 6-layer zoning: L1-L2 business, L3-L4 system, L5-L6 implementation
+        row_y = {1: 150, 2: 230, 3: 310, 4: 390, 5: 470, 6: 550}
 
         # Assign positions for business nodes
         business_x = {}
         for idx, bn in enumerate(business_nodes):
             x = 200 + idx * column_spacing
-            bn['position'] = {"x": x, "y": row_y[1]}
+            y = row_y[1 if (idx % 2) == 0 else 2]
+            bn['position'] = {"x": x, "y": y}
             business_x[bn['id']] = x
 
         # Group system nodes under business parents
@@ -191,7 +192,8 @@ def convert_analysis_result_to_frontend_format(analysis_result):
             count = len(group)
             for j, sn in enumerate(group):
                 offset = (j - (count - 1) / 2.0) * 180
-                sn['position'] = {"x": px + offset, "y": row_y[2]}
+                y = row_y[3 if (j % 2) == 0 else 4]
+                sn['position'] = {"x": px + offset, "y": y}
 
         # Group implementation nodes under system (fallback to business if no system parent)
         impl_by_parent = {}
@@ -206,7 +208,8 @@ def convert_analysis_result_to_frontend_format(analysis_result):
             count = len(group)
             for k, inn in enumerate(group):
                 offset = (k - (count - 1) / 2.0) * 140
-                inn['position'] = {"x": px + offset, "y": row_y[3]}
+                y = row_y[5 if (k % 2) == 0 else 6]
+                inn['position'] = {"x": px + offset, "y": y}
     except Exception as _:
         # If anything fails, keep zero positions and let client layout fallback
         pass

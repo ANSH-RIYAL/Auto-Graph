@@ -90,12 +90,12 @@
   "functions": ["create_user"],
   "classes": ["UserService"],
   "imports": ["utils.db"],
-  "metadata": {"purpose": "...", "complexity": "low|medium|high", "dependencies": ["..."], "line_count": 123}
+  "metadata": {"purpose": "...", "complexity": "low|medium|high", "dependencies": ["..."], "line_count": 123, "summary": "optional brief summary: routes/tables/public APIs", "external": false}
 }
 ```
 - Edge:
 ```json
-{ "from": "system_user_service", "to": "implementation_todo_create", "type": "contains", "metadata": {"relationship_type": "hierarchy"} }
+{ "from": "system_user_service", "to": "implementation_todo_create", "type": "contains", "metadata": {"relationship_type": "hierarchy", "examples": []} }
 ```
 
 ### Final Graph Object Shape
@@ -153,14 +153,21 @@ Location: `examples/real_world/todo_flask_app/`
   "nodes": [
     {"id": "business_todo", "name": "Todo Management", "type": "Domain", "level": "BUSINESS", "technical_depth": 1, "files": [], "functions": [], "classes": [], "imports": [], "metadata": {"purpose": "End-user task tracking"}},
     {"id": "system_api", "name": "API", "type": "Service", "level": "SYSTEM", "technical_depth": 2, "files": ["app.py"], "functions": ["list_todos", "create_todo", "complete_todo"], "classes": [], "imports": ["services.todo_service.TodoService"], "metadata": {"purpose": "HTTP routing and handlers"}},
-    {"id": "system_core", "name": "Core Services", "type": "Service", "level": "SYSTEM", "technical_depth": 2, "files": ["services/todo_service.py", "utils/db.py", "models/todo.py"], "functions": [], "classes": ["TodoService", "Todo", "InMemoryDB"], "imports": ["utils.db", "models.todo"], "metadata": {"purpose": "Business logic and storage"}},
+    {"id": "system_core", "name": "Core Services", "type": "Service", "level": "SYSTEM", "technical_depth": 2, "files": ["services/todo_service.py", "utils/db.py", "models/todo.py"], "functions": [], "classes": ["TodoService", "Todo", "InMemoryDB"], "imports": ["utils.db", "models.todo"], "metadata": {"purpose": "Business logic and storage", "summary": "Data ops via InMemoryDB"}},
     {"id": "implementation_api_create", "name": "create_todo", "type": "Function_Group", "level": "IMPLEMENTATION", "technical_depth": 3, "files": ["app.py"], "functions": ["create_todo"], "classes": [], "imports": ["services.todo_service.TodoService"], "metadata": {"purpose": "Create todo via POST"}}
   ],
   "edges": [
     {"from": "business_todo", "to": "system_api", "type": "contains", "metadata": {"relationship_type": "hierarchy"}},
     {"from": "business_todo", "to": "system_core", "type": "contains", "metadata": {"relationship_type": "hierarchy"}},
-    {"from": "system_api", "to": "system_core", "type": "depends_on"},
+    {"from": "system_api", "to": "system_core", "type": "depends_on", "metadata": {"examples": [{"http": {"method": "POST", "path": "/todos"}}]}},
     {"from": "system_api", "to": "implementation_api_create", "type": "contains"}
   ]
 }
 ```
+
+### Deterministic Positioning Checks (jq)
+- y-layers must be exactly `[150,230,310,390,470,550]`:
+  - `curl -s /api/analysis/<id>/graph | jq -r '[.nodes[].position.y] | unique | sort | @json'`
+- Edge-type list should be subset of `["contains","depends_on","calls"]`:
+  - `curl -s /api/analysis/<id>/graph | jq -r '[.edges[].type] | unique | sort | @json'`
+- Depth toggle must not change positions; only counts change.
