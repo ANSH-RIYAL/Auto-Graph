@@ -41,6 +41,119 @@ logger = get_logger(__name__)
 analysis_results = {}
 analysis_sessions = {}
 
+TOP_N_DEPENDS = 5
+
+def _build_viz_from_frontend(frontend: dict) -> dict:
+    nodes = list(frontend.get('nodes', []))
+    edges = list(frontend.get('edges', []))
+
+    # Indexes
+    by_id = {n['id']: n for n in nodes}
+    parent_of = {e['to_node']: e['from_node'] for e in edges if str(e.get('type','')).lower() == 'contains'}
+
+    def system_ancestor(nid: str):
+        cur = nid
+        while cur in parent_of:
+            cur = parent_of[cur]
+            n = by_id.get(cur)
+            if n and n.get('level') == 'SYSTEM':
+                return cur
+        return None
+
+    # depends_on rollup from calls
+    weights = {}
+    for e in edges:
+        if str(e.get('type','')).lower() != 'calls':
+            continue
+        a = e.get('from_node')
+        b = e.get('to_node')
+        sa = system_ancestor(a)
+        sb = system_ancestor(b)
+        if sa and sb and sa != sb:
+            weights[(sa, sb)] = weights.get((sa, sb), 0) + 1
+
+    per_src = {}
+    for (sa, sb), w in weights.items():
+        per_src.setdefault(sa, []).append((sb, w))
+    dep_edges = []
+    for sa, lst in per_src.items():
+        lst.sort(key=lambda x: (-x[1], x[0]))
+        for sb, w in lst[:TOP_N_DEPENDS]:
+            dep_edges.append({
+                'id': f'{sa}->{sb}#dep',
+                'from_node': sa,
+                'to_node': sb,
+                'type': 'depends_on',
+                'metadata': {'weight': int(w)}
+            })
+
+    # Merge edges (keep contains, add pruned depends_on)
+    merged_edges = [e for e in edges if str(e.get('type','')).lower() == 'contains'] + dep_edges
+
+    # Layout: six rows, degree-centered ordering
+    business = [n for n in nodes if n.get('level') == 'BUSINESS']
+    system = [n for n in nodes if n.get('level') == 'SYSTEM']
+    impl = [n for n in nodes if n.get('level') == 'IMPLEMENTATION']
+
+    def degree_map(es):
+        d = {n['id']:0 for n in nodes}
+        for e in es:
+            d[e['from_node']] = d.get(e['from_node'],0)+1
+            d[e['to_node']] = d.get(e['to_node'],0)+1
+        return d
+
+    deg = degree_map(merged_edges)
+    business.sort(key=lambda n: n.get('name',''))
+    col = 350
+    row = {1:150,2:230,3:310,4:390,5:470,6:550}
+    bx = {}
+    for i, bn in enumerate(business):
+        x = 200 + i*col
+        y = row[1 if i%2==0 else 2]
+        bn['position'] = {'x':x,'y':y}
+        bx[bn['id']] = x
+
+    # group systems by business parent
+    sys_by_parent = {}
+    for sn in system:
+        p = parent_of.get(sn['id'])
+        sys_by_parent.setdefault(p, []).append(sn)
+    sx = {}
+    for p, group in sys_by_parent.items():
+        group.sort(key=lambda n: (-deg.get(n['id'],0), n.get('name','')))
+        cx = bx.get(p, 200)
+        for j, sn in enumerate(group):
+            off = (j-(len(group)-1)/2.0)*180
+            y = row[3 if j%2==0 else 4]
+            sn['position'] = {'x': cx+off, 'y': y}
+            sx[sn['id']] = cx+off
+
+    # implementations under system ancestor
+    impl_groups = {}
+    for inn in impl:
+        sp = system_ancestor(inn['id'])
+        impl_groups.setdefault(sp, []).append(inn)
+    for sp, group in impl_groups.items():
+        cx = sx.get(sp, 200)
+        group.sort(key=lambda n: (-deg.get(n['id'],0), n.get('name','')))
+        for k, inn in enumerate(group):
+            off = (k-(len(group)-1)/2.0)*140
+            y = row[5 if k%2==0 else 6]
+            inn['position'] = {'x': cx+off, 'y': y}
+
+    # Ensure no blank summaries (placeholder)
+    for n in nodes:
+        md = n.get('metadata') or {}
+        if not md.get('purpose'):
+            md['purpose'] = 'information missing'
+            n['metadata'] = md
+
+    return {
+        'metadata': frontend.get('metadata', {}),
+        'nodes': nodes,
+        'edges': merged_edges,
+    }
+
 def convert_analysis_result_to_frontend_format(analysis_result):
     """Convert our backend analysis result to the frontend format with enhanced metadata"""
     if not analysis_result or 'graph' not in analysis_result or not analysis_result['graph']:
@@ -276,8 +389,11 @@ def upload_analysis():
             analyzer = CodebaseAnalyzer()
             result = analyzer.analyze_codebase(temp_dir)
             
-            # Convert to frontend format
+            # Convert to frontend format (AST-level)
             frontend_data = convert_analysis_result_to_frontend_format(result)
+            # Bake visualization-draft (contains + pruned depends_on + positions)
+            if frontend_data:
+                frontend_data = _build_viz_from_frontend(frontend_data)
             
             if frontend_data:
                 analysis_results[analysis_id] = frontend_data
