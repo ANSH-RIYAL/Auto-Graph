@@ -147,10 +147,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     // HLD/LLD radio handlers
-    ['hldModeHLD','hldModeLLD','hldModeAll'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('change', () => displayGraph());
-    });
+    const w = document.getElementById('hldMinWeight');
+    const wl = document.getElementById('hldMinWeightLabel');
+    if (w && wl) {
+        w.addEventListener('input', () => { wl.textContent = w.value; displayGraph(); });
+    }
     // HLD kind filter clicks (delegated)
     const kf = document.getElementById('hldKindFilters');
     if (kf) {
@@ -197,12 +198,19 @@ function initializeCytoscape() {
                 }
             },
             {
+                selector: 'node[level = "IMPLEMENTATION"]',
+                style: {
+                    'background-color': '#F4F4F5'
+                }
+            },
+            {
                 selector: 'node[type = "Cluster"]',
                 style: {
                     'shape': 'round-rectangle',
                     'background-color': 'data(clusterColor)',
+                    'background-opacity': 0.12,
                     'border-color': '#000000',
-                    'border-width': 2,
+                    'border-width': 3,
                     'padding': 24,
                     'compound-sizing-wrt-labels': 'exclude',
                     'opacity': 1
@@ -463,11 +471,11 @@ function displayGraph() {
     const elements = [];
     
     // Determine HLD/LLD preset mode when HLD view is active
-    const mode = (currentTopView === 'HLD') ? getHldMode() : 'DEPTH';
+    const mode = (currentTopView === 'HLD') ? 'HLD' : 'DEPTH';
     const filteredNodes = currentGraphData.nodes.filter(node => {
         const lvl = (node.level || '').toUpperCase();
         if (mode === 'HLD') {
-            // HLD: show only BUSINESS and SYSTEM; apply kind filter if set
+            // Conceptual: show only BUSINESS and SYSTEM and Cluster boxes
             if (lvl === 'IMPLEMENTATION') return false;
             if (hldSelectedKinds.size > 0) {
                 const k = String(node.type || 'Module');
@@ -525,6 +533,12 @@ function displayGraph() {
         if (isImpl(srcNode) || isImpl(dstNode)) return;
         // Also skip Business -> Cluster contains (server prunes, but double-guard in UI)
         if (t === 'contains' && srcNode && dstNode && srcNode.level === 'BUSINESS' && dstNode.type === 'Cluster') return;
+        // HLD min weight filter
+        if (mode === 'HLD' && (t === 'depends_on')) {
+            const minW = parseInt(document.getElementById('hldMinWeight')?.value || '1', 10);
+            const w = edge.metadata?.weight || 0;
+            if (w < minW) return;
+        }
         const edgeKey = edge.id || `${edge.from_node}-${edge.to_node}`;
         const levelWidth = (lvl) => (lvl === 'BUSINESS' ? 8 : (lvl === 'SYSTEM' ? 4 : 2));
         const src = srcNode || {};
@@ -839,7 +853,7 @@ async function loadGraphData() {
 
         // Populate HLD kind filters if in HLD view
         if (currentTopView === 'HLD') {
-            const kinds = (currentGraphData.metadata && currentGraphData.metadata.kinds) || [];
+            const kinds = (currentGraphData.metadata && (currentGraphData.metadata.kinds || currentGraphData.metadata.levels || [])) || [];
             const kf = document.getElementById('hldKindFilters');
             if (kf) {
                 kf.innerHTML = kinds.map(k => `<button type="button" class="toolbar-btn" data-kind="${k}">${k}</button>`).join(' ');
@@ -913,6 +927,17 @@ function showNodeDetails(node) {
     const details = [];
     details.push(`<div class="detail-item"><span class="detail-label">Type:</span> <span class="detail-value">${node.type}</span></div>`);
     details.push(`<div class="detail-item"><span class="detail-label">Level:</span> <span class="detail-value">${node.level}</span></div>`);
+    const desc = node.metadata?.description || node.metadata?.purpose || '';
+    if (desc) {
+        details.push(`<div class="detail-item"><span class="detail-label">Description:</span> <span class="detail-value">${desc}</span></div>`);
+    } else {
+        details.push(`<div class="detail-item"><span class="detail-label">Description:</span> <span class="detail-value">Not provided (LLM naming required)</span></div>`);
+    }
+    if (node.type === 'Cluster' && Array.isArray(node.metadata?.members)) {
+        const tops = (node.metadata.top_members || []).slice(0, 10);
+        const list = tops.length ? tops : node.metadata.members.slice(0, 10);
+        details.push(`<div class="detail-item"><span class="detail-label">Top Members:</span> <span class="detail-value">${list.join(', ')}</span></div>`);
+    }
     
     if (node.metadata?.purpose) {
         details.push(`<div class="detail-item"><span class="detail-label">Purpose:</span> <span class="detail-value">${node.metadata.purpose}</span></div>`);

@@ -139,6 +139,8 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
         }
         for e in edges if str(e.get('type','')).lower() == 'calls'
     ]
+    # Keep a copy of the original contains edges for mapping parents and pre-cluster calculations
+    contains_edges = [e for e in edges if str(e.get('type','')).lower() == 'contains']
     merged_edges = [e for e in edges if str(e.get('type','')).lower() == 'contains'] + dep_edges + call_edges
 
     # Layout: preset with 12 rows (1/3/8 bands) and degree-centered ordering
@@ -156,9 +158,8 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
     deg = degree_map(merged_edges)
     business.sort(key=lambda n: n.get('name',''))
     col = 350
-    # 12 vertical layers to improve readability with larger Business→System gap
-    # 12 rows total: Business 1, System 3, Implementation 8
-    rowvals = [120, 340, 420, 500, 580, 660, 740, 820, 900, 980, 1060, 1140]
+    # 12 vertical layers: Business top (1), Systems (2..6), Implementation/Clusters (7..12)
+    rowvals = [120, 260, 320, 380, 440, 500, 620, 700, 780, 860, 940, 1020]
     row = {i+1: y for i, y in enumerate(rowvals)}
     bx = {}
     for i, bn in enumerate(business):
@@ -178,8 +179,8 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
         cx = bx.get(p, 200)
         for j, sn in enumerate(group):
             off = (j-(len(group)-1)/2.0)*180
-            # place over 3 rows (2..4)
-            y = row[2 + (j % 3)]
+            # place over 5 rows (2..6)
+            y = row[2 + (j % 5)]
             sn['position'] = {'x': cx+off, 'y': y}
             sx[sn['id']] = cx+off
 
@@ -196,8 +197,8 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
         start_x = cx - (len(group)-1)/2.0 * col_w
         for k, inn in enumerate(group):
             x_pos = start_x + k*col_w
-            # place over 8 rows (5..12)
-            y_index = 5 + (k % 8)
+            # place over 6 rows (7..12)
+            y_index = 7 + (k % 6)
             y = row[y_index]
             inn['position'] = {'x': x_pos, 'y': y}
 
@@ -243,6 +244,8 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
                 continue
             cid = f"cluster_{sid}_{slug(k)}"
             member_ids = [m['id'] for m in members]
+            # compute translucent color and description
+            purpose_text = f"Group of {len(member_ids)} closely related implementation elements in '{k}'."
             cluster_nodes.append({
                 'id': cid,
                 'name': f"{k.title()} Cluster",
@@ -252,7 +255,8 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
                     'cluster': True,
                     'members': member_ids,
                     'counts': {'members': len(member_ids)},
-                    'purpose': f"Group of {len(member_ids)} closely related implementation elements in '{k}'."
+                    'purpose': purpose_text,
+                    'description': purpose_text
                 },
                 'position': {'x': sx.get(sid, 200), 'y': row[9]},  # place lower band
                 'color': cluster_color(cid)
@@ -270,22 +274,33 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
           if cid:
               n['parent'] = cid
               members_by_cluster[cid].append(n)
-      # Arrange clusters side-by-side in a single horizontal line and pack children grids
-      # Order clusters by size (desc) to allocate space first to larger ones
-      ordered = sorted(members_by_cluster.items(), key=lambda item: -len(item[1]))
+      # Arrange clusters: keep clusters of the same system adjacent; within each system order by size desc
+      grouped = defaultdict(list)
+      for cid, members in members_by_cluster.items():
+          parts = cid.split('_'); sid = parts[1] if len(parts) > 2 else 'sys'
+          grouped[sid].append((cid, members))
+      for sid in grouped:
+          grouped[sid].sort(key=lambda item: -len(item[1]))
+      ordered = []
+      for sid, items in grouped.items():
+          ordered.extend(items)
       line_y = row[11]
       cursor_x = 200.0
       gap = 80.0
+      layers = [row[9], row[10], row[11]]
+      layer_index = 0
       for cid, members in ordered:
           count = len(members)
           cols = int(max(2, round(count ** 0.5)))
           rows = int((count + cols - 1) // cols)
           spacing_x = 120.0
-          spacing_y = 80.0
+          spacing_y = 90.0
           width = (cols - 1) * spacing_x + 2 * 80.0
           center_x = cursor_x + width / 2.0
+           line_y = layers[layer_index % len(layers)]
           clusters_map[cid]['position'] = {'x': center_x, 'y': line_y}
           cursor_x += width + gap
+          layer_index += 1
 
           # Start grid centered inside cluster
           start_x = center_x - (cols - 1) * spacing_x / 2.0
@@ -294,25 +309,28 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
               r = idx // cols; c = idx % cols
               child['position'] = {'x': start_x + c * spacing_x, 'y': start_y + r * spacing_y}
 
-      # Re-anchor systems and business nodes to centers of their cluster ranges
+      # Re-anchor systems and business nodes to the midpoints of their cluster ranges
       if members_by_cluster:
-          sys_to_centers = defaultdict(list)
+          sys_to_minmax = defaultdict(lambda: [float('inf'), float('-inf')])
           for cid, mems in members_by_cluster.items():
               # cluster id format cluster_<systemId>_...
               parts = cid.split('_')
               sid = parts[1] if len(parts) > 2 else None
               if sid and cid in clusters_map:
-                  sys_to_centers[sid].append(clusters_map[cid]['position']['x'])
+                  x = clusters_map[cid]['position']['x']
+                  w = 0  # if we expand later to include width
+                  lo, hi = sys_to_minmax[sid]
+                  sys_to_minmax[sid] = [min(lo, x), max(hi, x)]
 
           sys_center_x = {}
           for sn in system:
-              centers = sys_to_centers.get(sn['id'])
-              if centers:
-                  sn['position']['x'] = sum(centers) / len(centers)
+              lo, hi = sys_to_minmax.get(sn['id'], [None, None])
+              if lo is not None and hi is not None and lo != float('inf') and hi != float('-inf'):
+                  sn['position']['x'] = (lo + hi) / 2.0
                   sys_center_x[sn['id']] = sn['position']['x']
 
-          # Business x is average of its system children x
-          sys_parent = { e['to_node']: e['from_node'] for e in new_contains if by_id.get(e['from_node'],{}).get('level')=='BUSINESS' and by_id.get(e['to_node'],{}).get('level')=='SYSTEM' }
+           # Business x is average of its system children x (use original contains edges; clusters handled later)
+          sys_parent = { e['to_node']: e['from_node'] for e in contains_edges if by_id.get(e['from_node'],{}).get('level')=='BUSINESS' and by_id.get(e['to_node'],{}).get('level')=='SYSTEM' }
           bus_to_sys = defaultdict(list)
           for sid, bid in sys_parent.items():
               bus_to_sys[bid].append(sid)
@@ -321,24 +339,11 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
               if xs:
                   bn['position']['x'] = sum(xs) / len(xs)
 
-    # Replace system→implementation contains with system→cluster; keep cluster→impl contains for drill-down
-    contains_edges = [e for e in edges if str(e.get('type','')).lower() == 'contains']
-    new_contains = []
+    # Keep original system→implementation contains; add cluster→impl contains for drill-down
+    new_contains = list(contains_edges)
     if do_cluster:
-      for e in contains_edges:
-          f = e.get('from_node'); t = e.get('to_node')
-          if by_id.get(f, {}).get('level') == 'SYSTEM' and by_id.get(t, {}).get('level') == 'IMPLEMENTATION':
-              cid = impl_to_cluster.get(t)
-              if cid:
-                  new_contains.append({'id': f"{f}->{cid}#contains","from_node": f, "to_node": cid, "type": 'contains', 'metadata': {}})
-                  # also keep cluster→impl
-                  new_contains.append({'id': f"{cid}->{t}#contains","from_node": cid, "to_node": t, "type": 'contains', 'metadata': {}})
-              else:
-                  new_contains.append(e)
-          else:
-              new_contains.append(e)
-    else:
-      new_contains = contains_edges
+        for mid, cid in impl_to_cluster.items():
+            new_contains.append({'id': f"{cid}->{mid}#contains","from_node": cid, "to_node": mid, "type": 'contains', 'metadata': {}})
 
     # Roll up implementation calls into cluster-level depends_on
     cluster_weights = defaultdict(int)
@@ -444,12 +449,47 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
         'Actor': '#0EA5E9'
     }
     level_palette = { 'BUSINESS': '#0EA5E9', 'SYSTEM': '#3B82F6', 'IMPLEMENTATION': '#94A3B8' }
+    # Palette seeds: 10 business, 20 system (paired 2 per business), 200 implementation
+    business_palette = ['#1E3A8A','#B91C1C','#0F766E','#7C2D12','#6D28D9','#0B5ED7','#065F46','#7E22CE','#BE185D','#365314']
+    system_palette = [
+        '#3B82F6','#60A5FA', '#EF4444','#F87171', '#14B8A6','#2DD4BF', '#F59E0B','#FBBF24', '#8B5CF6','#A78BFA',
+        '#10B981','#34D399', '#F97316','#FB923C', '#06B6D4','#22D3EE', '#84CC16','#A3E635', '#D946EF','#E879F9'
+    ]
+    impl_palette = [
+        '#CBD5E1','#D1D5DB','#E5E7EB','#F3F4F6','#E2E8F0','#F1F5F9','#E4E4E7','#F4F4F5','#EDE9FE','#FAE8FF',
+    ] * 20  # repeat to reach ~200
     for n in nodes:
         md = n.get('metadata') or {}
         lvl = n.get('level', 'IMPLEMENTATION')
         md['size_factor'] = level_to_factor.get(lvl, 1)
-        ntype = n.get('type') or ''
-        md['color'] = type_palette.get(ntype, level_palette.get(lvl, '#94A3B8'))
+        # assign hierarchical colors deterministically
+        if lvl == 'BUSINESS':
+            idx = sum(ord(c) for c in (n.get('id') or '')) % len(business_palette)
+            md['color'] = business_palette[idx]
+        elif lvl == 'SYSTEM':
+            # pick based on business parent bucket
+            p = parent_of.get(n.get('id'))
+            base_index = sum(ord(c) for c in (p or '')) % (len(business_palette))
+            pair = system_palette[(base_index*2) % len(system_palette):(base_index*2+2) % len(system_palette)]
+            if not pair:
+                pair = [system_palette[0]]
+            idx = sum(ord(c) for c in (n.get('id') or '')) % len(pair)
+            md['color'] = pair[idx]
+        elif n.get('type') == 'Cluster':
+            # translucent shade derived from its system parent color
+            sid = None
+            for e in contains_edges:
+                if e.get('to_node') == n.get('id'):
+                    sid = e.get('from_node'); break
+            sys_color = level_palette['SYSTEM']
+            if sid:
+                sp = next((sn for sn in system if sn['id']==sid), None)
+                sys_color = (sp.get('metadata') or {}).get('color', sys_color) if sp else sys_color
+            md['color'] = sys_color
+        else:
+            # implementation symbols
+            idx = sum(ord(c) for c in (n.get('id') or '')) % len(impl_palette)
+            md['color'] = impl_palette[idx]
         # Add paths alias for UI/exports
         if (n.get('files') or []) and 'paths' not in md:
             md['paths'] = list(n.get('files') or [])
@@ -620,18 +660,14 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
                 md['purpose'] = desc
             n['metadata'] = md
 
-    # Optional: LLM-based naming for bland names (BUSINESS/SYSTEM only)
+    # Compulsory: LLM-based naming for Business/System and cluster descriptions (if OPENAI_API_KEY is set)
     try:
-        bland = []
-        for n in nodes:
-            if n.get('level') not in ('BUSINESS','SYSTEM'):
-                continue
-            name = (n.get('name') or '').strip()
-            if not name or name.startswith('system_') or name.startswith('business_') or name.lower() in {'service','module','domain','other','api layer','api'}:
-                bland.append(n)
-        if bland and OpenAI and os.environ.get('OPENAI_API_KEY'):
+        targets = [n for n in nodes if n.get('level') in ('BUSINESS','SYSTEM')]
+        # Also prepare clusters missing description
+        clusters_to_describe = [n for n in nodes if n.get('type')=='Cluster' and not ((n.get('metadata') or {}).get('description'))]
+        if (targets or clusters_to_describe) and OpenAI and os.environ.get('OPENAI_API_KEY'):
             client = OpenAI()
-            for n in bland[:20]:
+            for n in targets:
                 brief = {
                     'id': n.get('id'),
                     'level': n.get('level'),
@@ -653,6 +689,34 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
                         n['name'] = suggestion
                 except Exception:
                     pass
+            # Cluster descriptions (2 lines max)
+            for n in clusters_to_describe:
+                members = (n.get('metadata') or {}).get('members', [])
+                context = {
+                    'id': n.get('id'),
+                    'member_count': len(members),
+                    'sample_members': members[:5]
+                }
+                prompt = (
+                    'Write a clear two-line English description of this implementation cluster for a PM. '
+                    'Line 1: what the group represents; Line 2: examples (by id).\n' + json.dumps(context)
+                )
+                try:
+                    resp = client.chat.completions.create(model=os.environ.get('OPENAI_MODEL','gpt-4o-mini'),
+                                                          messages=[{'role':'system','content':'You describe software modules briefly for PMs.'},
+                                                                    {'role':'user','content':prompt}],
+                                                          temperature=0.1, max_tokens=80)
+                    desc = (resp.choices[0].message.content or '').strip()
+                    md = n.get('metadata') or {}
+                    if desc:
+                        md['description'] = desc
+                        n['metadata'] = md
+                except Exception:
+                    pass
+        else:
+            # Explicit log so it's clear when LLM is skipped
+            if not os.environ.get('OPENAI_API_KEY'):
+                logger.warning('OPENAI_API_KEY not set; skipping LLM naming/description step.')
     except Exception:
         pass
 
@@ -717,7 +781,7 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
         'edges': merged_edges,
     }
 
-    # Also emit split artifacts: viz_core (no positions/colors), viz_layout
+    # Also emit split artifacts: viz_core (no positions/colors), viz_layout, and viz_meta
     try:
         project = Path(codebase_dir).parts[-1] or 'project'
         out_dir = Path('graph') / project / 'exports'
@@ -725,6 +789,7 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
         # Core
         core_nodes = []
         layout_nodes = []
+        meta_nodes = []
         for n in nodes:
             nd = dict(n)
             vis = (nd.get('metadata') or {}).get('color')
@@ -735,10 +800,14 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
                 'size_factor': (n.get('metadata') or {}).get('size_factor', 1),
                 'color': (n.get('metadata') or {}).get('color')
             }})
+            md = n.get('metadata') or {}
+            meta_nodes.append({'id': n['id'], 'name': n.get('name'), 'level': n.get('level'), 'type': n.get('type'), 'description': md.get('description') or md.get('purpose')})
         viz_core = {'metadata': {'project': project}, 'nodes': core_nodes, 'edges': merged_edges}
         viz_layout = {'metadata': viz['metadata']['layout'], 'nodes': layout_nodes}
+        viz_meta = {'metadata': {'project': project}, 'nodes': meta_nodes}
         (out_dir / 'viz_core.json').write_text(json.dumps(viz_core, indent=2), encoding='utf-8')
         (out_dir / 'viz_layout.json').write_text(json.dumps(viz_layout, indent=2), encoding='utf-8')
+        (out_dir / 'viz_meta.json').write_text(json.dumps(viz_meta, indent=2), encoding='utf-8')
     except Exception:
         pass
 
