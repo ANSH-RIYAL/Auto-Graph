@@ -5,11 +5,11 @@ from collections import defaultdict
 from datetime import datetime
 import re
 
-Y_LAYERS = [150, 230, 310, 390, 470, 550]
+Y_LAYERS = [120, 180, 240, 300, 360, 420, 480, 540, 600, 660, 720, 780]
 LEVEL_ROWS = {
-    "BUSINESS": [Y_LAYERS[0], Y_LAYERS[1]],
-    "SYSTEM": [Y_LAYERS[2], Y_LAYERS[3]],
-    "IMPLEMENTATION": [Y_LAYERS[4], Y_LAYERS[5]],
+    "BUSINESS": Y_LAYERS[0:4],
+    "SYSTEM": Y_LAYERS[4:8],
+    "IMPLEMENTATION": Y_LAYERS[8:12],
 }
 TOP_N_DEPENDS = 5
 MIN_WEIGHT = 1
@@ -265,7 +265,7 @@ def build_viz(ast_graph: dict) -> dict:
     b_order = sorted(business_ids)
     for i, bid in enumerate(b_order):
         x = 200 + i * 350
-        y = LEVEL_ROWS["BUSINESS"][0 if i % 2 == 0 else 1]
+        y = LEVEL_ROWS["BUSINESS"][i % len(LEVEL_ROWS["BUSINESS"])]
         viz_nodes[bid]["position"] = {"x": x, "y": y}
         bx[bid] = x
 
@@ -279,7 +279,7 @@ def build_viz(ast_graph: dict) -> dict:
         center = bx.get(bp, 200)
         for j, sid in enumerate(ordered):
             offset = (j - (len(ordered) - 1) / 2.0) * 180
-            y = LEVEL_ROWS["SYSTEM"][0 if j % 2 == 0 else 1]
+            y = LEVEL_ROWS["SYSTEM"][j % len(LEVEL_ROWS["SYSTEM"])]
             viz_nodes[sid]["position"] = {"x": center + offset, "y": y}
             sx[sid] = center + offset
 
@@ -292,7 +292,7 @@ def build_viz(ast_graph: dict) -> dict:
         ordered = degree_center_order(group, viz_edges)
         for k, iid in enumerate(ordered):
             offset = (k - (len(ordered) - 1) / 2.0) * 140
-            y = LEVEL_ROWS["IMPLEMENTATION"][0 if k % 2 == 0 else 1]
+            y = LEVEL_ROWS["IMPLEMENTATION"][k % len(LEVEL_ROWS["IMPLEMENTATION"])]
             viz_nodes[iid]["position"] = {"x": cx + offset, "y": y}
 
     viz = {

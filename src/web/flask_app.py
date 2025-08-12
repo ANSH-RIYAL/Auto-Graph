@@ -4,6 +4,7 @@ import os
 import sys
 from datetime import datetime
 import uuid
+from collections import defaultdict
 from pathlib import Path
 import tempfile
 import zipfile
@@ -43,7 +44,42 @@ analysis_sessions = {}
 
 TOP_N_DEPENDS = 5
 
-def _build_viz_from_frontend(frontend: dict) -> dict:
+import re
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None
+
+def _extract_flask_routes(codebase_dir: str):
+    routes = []
+    pat = re.compile(r"@app\.route\(\s*['\"]([^'\"]+)['\"]\s*(?:,\s*methods=\[([^\]]+)\])?\)")
+    def_pat = re.compile(r"def\s+([a-zA-Z0-9_]+)\s*\(")
+    for root, _, files in os.walk(codebase_dir or "."):
+        for f in files:
+            if not f.endswith('.py'):
+                continue
+            p = os.path.join(root, f)
+            try:
+                with open(p, 'r', encoding='utf-8', errors='ignore') as fh:
+                    content = fh.read()
+                for m in pat.finditer(content):
+                    path = m.group(1)
+                    methods_raw = m.group(2) or ''
+                    methods = []
+                    for token in methods_raw.split(','):
+                        t = token.strip().strip('\'"').upper()
+                        if t in {'GET','POST','PUT','PATCH','DELETE'}:
+                            methods.append(t)
+                    # naive: find next def name
+                    dm = def_pat.search(content, m.end())
+                    handler = dm.group(1) if dm else 'handler'
+                    routes.append({"method": methods[0] if methods else 'GET', "path": path, "handler": handler})
+            except Exception:
+                continue
+    return routes
+
+
+def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
     nodes = list(frontend.get('nodes', []))
     edges = list(frontend.get('edges', []))
 
@@ -87,8 +123,18 @@ def _build_viz_from_frontend(frontend: dict) -> dict:
                 'metadata': {'weight': int(w)}
             })
 
-    # Merge edges (keep contains, add pruned depends_on)
-    merged_edges = [e for e in edges if str(e.get('type','')).lower() == 'contains'] + dep_edges
+    # Merge edges (keep contains, add pruned depends_on, and raw calls for implementation-level toggling)
+    call_edges = [
+        {
+            'id': f"{e.get('from_node')}->{e.get('to_node')}#call",
+            'from_node': e.get('from_node'),
+            'to_node': e.get('to_node'),
+            'type': 'calls',
+            'metadata': e.get('metadata', {})
+        }
+        for e in edges if str(e.get('type','')).lower() == 'calls'
+    ]
+    merged_edges = [e for e in edges if str(e.get('type','')).lower() == 'contains'] + dep_edges + call_edges
 
     # Layout: six rows, degree-centered ordering
     business = [n for n in nodes if n.get('level') == 'BUSINESS']
@@ -105,11 +151,14 @@ def _build_viz_from_frontend(frontend: dict) -> dict:
     deg = degree_map(merged_edges)
     business.sort(key=lambda n: n.get('name',''))
     col = 350
-    row = {1:150,2:230,3:310,4:390,5:470,6:550}
+    # 12 vertical layers to improve readability
+    # 12 rows total: Business 1, System 3, Implementation 8
+    rowvals = [120, 200, 280, 360, 440, 520, 600, 680, 760, 840, 920, 1000]
+    row = {i+1: y for i, y in enumerate(rowvals)}
     bx = {}
     for i, bn in enumerate(business):
         x = 200 + i*col
-        y = row[1 if i%2==0 else 2]
+        y = row[1]  # single business band
         bn['position'] = {'x':x,'y':y}
         bx[bn['id']] = x
 
@@ -124,7 +173,8 @@ def _build_viz_from_frontend(frontend: dict) -> dict:
         cx = bx.get(p, 200)
         for j, sn in enumerate(group):
             off = (j-(len(group)-1)/2.0)*180
-            y = row[3 if j%2==0 else 4]
+            # place over 3 rows (2..4)
+            y = row[2 + (j % 3)]
             sn['position'] = {'x': cx+off, 'y': y}
             sx[sn['id']] = cx+off
 
@@ -138,7 +188,9 @@ def _build_viz_from_frontend(frontend: dict) -> dict:
         group.sort(key=lambda n: (-deg.get(n['id'],0), n.get('name','')))
         for k, inn in enumerate(group):
             off = (k-(len(group)-1)/2.0)*140
-            y = row[5 if k%2==0 else 6]
+            # place over 8 rows (5..12)
+            y_index = 5 + (k % 8)
+            y = row[y_index]
             inn['position'] = {'x': cx+off, 'y': y}
 
     # Ensure no blank summaries (placeholder)
@@ -146,6 +198,66 @@ def _build_viz_from_frontend(frontend: dict) -> dict:
         md = n.get('metadata') or {}
         if not md.get('purpose'):
             md['purpose'] = 'information missing'
+            n['metadata'] = md
+
+    # External/User stubs and API routes
+    sys_api = next((n for n in nodes if n.get('level')=='SYSTEM' and 'api' in n.get('name','').lower()), None)
+    if sys_api:
+        # user actor
+        user_id = 'actor_user'
+        if not any(nn.get('id')==user_id for nn in nodes):
+            nodes.append({"id":user_id,"name":"User","type":"Actor","level":"BUSINESS","metadata":{"purpose":"external actor"},"position":{"x":0,"y":150}})
+        merged_edges.append({'id':f'{user_id}->{sys_api["id"]}#dep','from_node':user_id,'to_node':sys_api['id'],'type':'depends_on','metadata':{'weight':1}})
+        # routes
+        routes = _extract_flask_routes(codebase_dir)
+        api_md = sys_api.get('metadata') or {}
+        api_md['routes'] = routes
+        sys_api['metadata'] = api_md
+
+    # Scan codebase for externals
+    try:
+        code = ''
+        for root,_,files in os.walk(codebase_dir or "."):
+            for f in files:
+                if f.endswith('.py'):
+                    with open(os.path.join(root,f),'r',encoding='utf-8',errors='ignore') as fh:
+                        code += fh.read()[:20000]
+        if 'openai' in code and sys_api:
+            stub='external_llm_service'
+            if not any(nn.get('id')==stub for nn in nodes):
+                nodes.append({"id":stub,"name":"LLM Service","type":"External","level":"SYSTEM","metadata":{"purpose":"external dependency"},"position":{"x":0,"y":390}})
+            merged_edges.append({'id':f'{sys_api["id"]}->{stub}#dep','from_node':sys_api['id'],'to_node':stub,'type':'depends_on','metadata':{'weight':1}})
+        if ('jwt' in code or 'oidc' in code) and sys_api:
+            stub='external_auth_provider'
+            if not any(nn.get('id')==stub for nn in nodes):
+                nodes.append({"id":stub,"name":"Auth Provider","type":"External","level":"SYSTEM","metadata":{"purpose":"external dependency"},"position":{"x":0,"y":390}})
+            merged_edges.append({'id':f'{sys_api["id"]}->{stub}#dep','from_node':sys_api['id'],'to_node':stub,'type':'depends_on','metadata':{'weight':1}})
+    except Exception:
+        pass
+
+    # Deterministic module descriptions (fallback when LLM absent)
+    name_map = {n['id']: n.get('name') for n in nodes}
+    out_edges = defaultdict(list)
+    in_edges = defaultdict(list)
+    for e in merged_edges:
+        out_edges[e['from_node']].append(e)
+        in_edges[e['to_node']].append(e)
+    for n in nodes:
+        lvl = n.get('level')
+        if lvl in ('BUSINESS','SYSTEM'):
+            outs = out_edges.get(n['id'], [])
+            ins = in_edges.get(n['id'], [])
+            def summarize(es):
+                t = defaultdict(int)
+                for ed in es:
+                    t[ed.get('type','')] += 1
+                return ', '.join(f"{k}: {v}" for k,v in t.items() if k)
+            desc = f"{n.get('name','Module')} handles {n.get('type','component').lower()} duties. Incoming: {summarize(ins)}. Outgoing: {summarize(outs)}. Neighbors: "
+            neigh = sorted({ name_map.get(e['from_node']) for e in ins } | { name_map.get(e['to_node']) for e in outs } - {n.get('name')})
+            desc += ', '.join([x for x in neigh if x]) or 'none'
+            md = n.get('metadata') or {}
+            if not md.get('purpose') or md.get('purpose') == 'information missing':
+                md['purpose'] = desc
             n['metadata'] = md
 
     return {
@@ -393,7 +505,7 @@ def upload_analysis():
             frontend_data = convert_analysis_result_to_frontend_format(result)
             # Bake visualization-draft (contains + pruned depends_on + positions)
             if frontend_data:
-                frontend_data = _build_viz_from_frontend(frontend_data)
+                frontend_data = _build_viz_from_frontend(frontend_data, temp_dir)
             
             if frontend_data:
                 analysis_results[analysis_id] = frontend_data
@@ -478,6 +590,41 @@ def get_graph_data(analysis_id):
         return jsonify({'error': 'Analysis not found or not completed'}), 404
     
     return jsonify(analysis_results[analysis_id])
+
+@app.route('/api/analysis/<analysis_id>/hld_graph')
+def get_hld_graph_data(analysis_id):
+    """Get HLD/LLD-adapted graph data (reuses canonical positions and core edge types)."""
+    if analysis_id not in analysis_results:
+        return jsonify({'error': 'Analysis not found or not completed'}), 404
+
+    try:
+        base = analysis_results[analysis_id]
+
+        # Shallow copy nodes/edges; preserve server-side positions and canonical edge types
+        nodes = list(base.get('nodes', []))
+        edges = [e for e in base.get('edges', []) if str(e.get('type', '')).lower() in {'contains','depends_on','depends','calls'}]
+
+        # Normalize depends alias
+        for e in edges:
+            t = str(e.get('type','')).lower()
+            if t == 'depends':
+                e['type'] = 'depends_on'
+
+        # Collect kinds/types for UI filters (use type names as HLDBuilder does)
+        kinds = sorted({ str(n.get('type') or 'Module') for n in nodes })
+
+        metadata = dict(base.get('metadata', {}))
+        metadata['kinds'] = kinds
+        # Carry over statistics if present
+        out = {
+            'metadata': metadata,
+            'nodes': nodes,
+            'edges': edges
+        }
+        return jsonify(out)
+    except Exception as e:
+        logger.error(f"HLD graph build error for {analysis_id}: {str(e)}")
+        return jsonify({'error': f'HLD graph build failed: {str(e)}'}), 500
 
 @app.route('/api/analysis/<analysis_id>/logs')
 def get_analysis_logs(analysis_id):

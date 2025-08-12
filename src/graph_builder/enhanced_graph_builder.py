@@ -54,6 +54,16 @@ class EnhancedGraphBuilder:
         logger.info("Performing semantic analysis...")
         
         for file_path, file_data in parsing_result['parsed_files'].items():
+            # Skip non-core sources (tests/docs/examples/static)
+            try:
+                file_info = file_data.get('file_info')
+                p = str(file_path).replace('\\','/').lower()
+                if any(seg in p for seg in ['/tests/', '/test/', '/docs/', '/examples/', '/example/', '/static/', '/assets/']):
+                    continue
+                if file_info and hasattr(file_info, 'category') and file_info.category not in ('backend',):
+                    continue
+            except Exception:
+                pass
             try:
                 # Get file content from parsing result
                 file_content = file_data.get('file_content', '')
@@ -126,9 +136,10 @@ class EnhancedGraphBuilder:
             nx = None
             greedy_modularity_communities = None
 
-        # Build a file-level import graph
+        # Build a file-level import graph (core files only)
         file_imports = {}
-        file_paths = list(parsing_result['parsed_files'].keys())
+        file_paths = [fp for fp, fd in parsing_result['parsed_files'].items()
+                      if not any(seg in str(fp).replace('\\','/').lower() for seg in ['/tests/','/test/','/docs/','/examples/','/example/','/static/','/assets/'])]
         normalized = {fp: Path(fp) for fp in file_paths}
 
         def matches_import(target_path: Path, imp: str) -> bool:
@@ -147,26 +158,21 @@ class EnhancedGraphBuilder:
                     targets.add(other)
             file_imports[fp] = list(targets)
 
-        # Create clusters
+        # Group by package submodule under src/<package>/<group>/
         clusters: List[List[str]] = []
-        if nx is not None and greedy_modularity_communities is not None:
-            G = nx.Graph()
-            G.add_nodes_from(file_paths)
-            for src, tgts in file_imports.items():
-                for tgt in tgts:
-                    G.add_edge(src, tgt)
-            if G.number_of_edges() > 0:
-                comms = list(greedy_modularity_communities(G))
-                clusters = [list(c) for c in comms if len(c) > 0]
-            else:
-                clusters = [[fp] for fp in file_paths]
-        else:
-            # Fallback: group by immediate parent directory name
-            dir_groups: Dict[str, List[str]] = {}
-            for fp in file_paths:
-                key = Path(fp).parent.name or 'root'
-                dir_groups.setdefault(key, []).append(fp)
-            clusters = list(dir_groups.values())
+        pkg_groups: Dict[str, List[str]] = {}
+        for fp in file_paths:
+            lower = str(fp).replace('\\','/')
+            key = Path(fp).parent.name
+            if '/src/' in lower:
+                rel = lower.split('/src/',1)[1]
+                parts = rel.split('/')
+                if len(parts) >= 2:
+                    key = parts[1]
+                else:
+                    key = parts[0]
+            pkg_groups.setdefault(key, []).append(fp)
+        clusters = list(pkg_groups.values())
 
         # Create SYSTEM nodes from clusters
         system_nodes: Dict[str, GraphNode] = {}
@@ -192,12 +198,10 @@ class EnhancedGraphBuilder:
 
         # Create nodes and containment edges
         for idx, files in enumerate(clusters):
-            # Heuristic name: prefer shared parent directory, else first file stem
             dir_names = [Path(f).parent.name for f in files]
             common_dir = max(set(dir_names), key=dir_names.count) if dir_names else f"cluster_{idx+1}"
-            first_stem = Path(files[0]).stem if files else f"cluster_{idx+1}"
-            pretty_name = common_dir.replace('_',' ').title() if common_dir else first_stem.title()
-            node_id = f"system_{common_dir}_{idx+1}"
+            pretty_name = common_dir.replace('_',' ').title()
+            node_id = f"system_{common_dir.lower()}_{idx+1}"
             system_node = GraphNode(
                 id=node_id,
                 name=f"{pretty_name}",
@@ -521,28 +525,47 @@ class EnhancedGraphBuilder:
     def _group_files_by_semantics(self, parsing_result: Dict[str, Any]) -> Dict[str, List[str]]:
         """Group files by their semantic analysis results."""
         groups = {
-            'API Layer': [],
-            'Service Layer': [],
-            'Data Models': [],
-            'Utilities': [],
-            'Configuration': [],
+            'Core Runtime': [],
+            'Models': [],
+            'Components': [],
+            'Controls': [],
+            'Actions': [],
+            'Data': [],
+            'Integrations': [],
             'Other': []
         }
         
         for file_path, file_data in parsing_result['parsed_files'].items():
-            semantic_result = self.semantic_results.get(file_path, {})
-            component_type = semantic_result.get('component_type', NodeType.MODULE)
-            
-            if component_type == NodeType.API:
-                groups['API Layer'].append(file_path)
-            elif component_type == NodeType.SERVICE:
-                groups['Service Layer'].append(file_path)
-            elif component_type == NodeType.MODEL:
-                groups['Data Models'].append(file_path)
-            elif component_type == NodeType.UTILITY:
-                groups['Utilities'].append(file_path)
-            elif component_type in [NodeType.DATABASE, NodeType.CLIENT]:
-                groups['Configuration'].append(file_path)
+            # Only core sources
+            try:
+                file_info = file_data.get('file_info')
+                p = str(file_path).replace('\\','/')
+                pl = p.lower()
+                if any(seg in pl for seg in ['/tests/','/test/','/docs/','/examples/','/example/','/static/','/assets/']):
+                    continue
+                if file_info and hasattr(file_info, 'category') and file_info.category not in ('backend',):
+                    continue
+            except Exception:
+                pass
+            # Path-based buckets
+            if '/src/' in p:
+                rel = p.split('/src/',1)[1]
+                if rel.startswith('vizro/_vizro'):
+                    groups['Core Runtime'].append(file_path)
+                elif '/models/_components/' in rel:
+                    groups['Components'].append(file_path)
+                elif '/models/_controls/' in rel:
+                    groups['Controls'].append(file_path)
+                elif '/models/' in rel:
+                    groups['Models'].append(file_path)
+                elif '/actions/' in rel:
+                    groups['Actions'].append(file_path)
+                elif '/managers/' in rel:
+                    groups['Data'].append(file_path)
+                elif '/integrations/' in rel:
+                    groups['Integrations'].append(file_path)
+                else:
+                    groups['Other'].append(file_path)
             else:
                 groups['Other'].append(file_path)
         

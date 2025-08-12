@@ -3,6 +3,8 @@ let currentAnalysisId = null;
 let currentGraphData = null;
 let currentDepth = 1;
 let currentViewMode = 'HIERARCHY';
+let currentTopView = 'BSI'; // 'BSI' | 'HLD'
+let hldSelectedKinds = new Set();
 let selectedNode = null;
 let isProcessing = false;
 let cy = null;
@@ -127,6 +129,42 @@ document.addEventListener('DOMContentLoaded', function() {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', () => displayGraph());
     });
+    // Top view toggle
+    const viewBSI = document.getElementById('viewBSI');
+    const viewHLD = document.getElementById('viewHLD');
+    if (viewBSI && viewHLD) {
+        viewBSI.addEventListener('click', async () => {
+            currentTopView = 'BSI';
+            const hc = document.getElementById('hldControls');
+            if (hc) hc.style.display = 'none';
+            await loadGraphData();
+        });
+        viewHLD.addEventListener('click', async () => {
+            currentTopView = 'HLD';
+            const hc = document.getElementById('hldControls');
+            if (hc) hc.style.display = 'block';
+            await loadGraphData();
+        });
+    }
+    // HLD/LLD radio handlers
+    ['hldModeHLD','hldModeLLD','hldModeAll'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', () => displayGraph());
+    });
+    // HLD kind filter clicks (delegated)
+    const kf = document.getElementById('hldKindFilters');
+    if (kf) {
+        kf.addEventListener('click', (e) => {
+            const t = e.target;
+            if (t && t.dataset && t.dataset.kind) {
+                const kind = t.dataset.kind;
+                if (hldSelectedKinds.has(kind)) hldSelectedKinds.delete(kind); else hldSelectedKinds.add(kind);
+                // toggle visual state
+                t.classList.toggle('active', hldSelectedKinds.has(kind));
+                displayGraph();
+            }
+        });
+    }
 });
 
 // Initialize Cytoscape
@@ -192,7 +230,6 @@ function initializeCytoscape() {
                     'line-color': '#95a5a6',
                     'target-arrow-color': '#95a5a6',
                     'target-arrow-shape': 'triangle',
-                    'target-arrow-width': 8,
                     'curve-style': 'bezier',
                     'content': 'data(label)',
                     'font-size': '11px',
@@ -229,7 +266,6 @@ function initializeCytoscape() {
                 style: {
                     'source-arrow-shape': 'triangle',
                     'source-arrow-color': '#7f8c8d',
-                    'source-arrow-width': 8,
                     'opacity': 0.2
                 }
             },
@@ -406,13 +442,36 @@ function getNodeParentModule(node) {
 
 // Display graph with enhanced visualization
 function displayGraph() {
-    if (!currentGraphData) return;
+    if (!currentGraphData || !Array.isArray(currentGraphData.nodes) || !Array.isArray(currentGraphData.edges)) {
+        return;
+    }
     
     const elements = [];
     
-    // Filter nodes by technical depth
+    // Determine HLD/LLD preset mode when HLD view is active
+    const mode = (currentTopView === 'HLD') ? getHldMode() : 'DEPTH';
     const filteredNodes = currentGraphData.nodes.filter(node => {
-        const nodeDepth = node.metadata?.technical_depth || (node.level === 'BUSINESS' ? 1 : (node.level === 'SYSTEM' ? 2 : 3));
+        const lvl = (node.level || '').toUpperCase();
+        if (mode === 'HLD') {
+            // HLD: show only BUSINESS and SYSTEM; apply kind filter if set
+            if (lvl === 'IMPLEMENTATION') return false;
+            if (hldSelectedKinds.size > 0) {
+                const k = String(node.type || 'Module');
+                return hldSelectedKinds.has(k);
+            }
+            return true;
+        }
+        if (mode === 'LLD') {
+            // LLD: show only SYSTEM and IMPLEMENTATION; apply kind filter on SYSTEM only
+            if (lvl === 'BUSINESS') return false;
+            if (lvl === 'SYSTEM' && hldSelectedKinds.size > 0) {
+                const k = String(node.type || 'Module');
+                return hldSelectedKinds.has(k);
+            }
+            return true;
+        }
+        if (mode === 'ALL') return true;
+        const nodeDepth = node.metadata?.technical_depth || (lvl === 'BUSINESS' ? 1 : (lvl === 'SYSTEM' ? 2 : 3));
         return nodeDepth <= currentDepth;
     });
     
@@ -465,6 +524,11 @@ function displayGraph() {
     
     setTimeout(() => cy.fit(), 300);
     
+    // Update view label
+    if (elements.depthLabel) {
+        elements.depthLabel.textContent = getCurrentDepthLabel();
+    }
+
     // Update statistics
     updateGraphStats();
     updatePMDashboard();
@@ -474,8 +538,13 @@ function displayGraph() {
 function updateGraphStats() {
     if (!currentGraphData) return;
     
+    const mode = (currentTopView === 'HLD') ? getHldMode() : 'DEPTH';
     const filteredNodes = currentGraphData.nodes.filter(node => {
-        const nodeDepth = node.metadata?.technical_depth || (node.level === 'HLD' ? 1 : 3);
+        const lvl = (node.level || '').toUpperCase();
+        if (mode === 'HLD') return lvl !== 'IMPLEMENTATION';
+        if (mode === 'LLD') return lvl !== 'BUSINESS';
+        if (mode === 'ALL') return true;
+        const nodeDepth = node.metadata?.technical_depth || (lvl === 'BUSINESS' ? 1 : (lvl === 'SYSTEM' ? 2 : 3));
         return nodeDepth <= currentDepth;
     });
     
@@ -504,12 +573,23 @@ function updatePMDashboard() {
 
 // Get current depth label
 function getCurrentDepthLabel() {
+    if (currentTopView === 'HLD') {
+        const m = getHldMode();
+        if (m === 'HLD') return 'HLD View';
+        if (m === 'LLD') return 'LLD View';
+        if (m === 'ALL') return 'Complete Architecture';
+    }
     switch(currentDepth) {
         case 1: return 'Business View';
         case 2: return 'System View';
         case 3: return 'Implementation View';
         default: return 'Unknown';
     }
+}
+
+function getHldMode() {
+    const h = document.querySelector('input[name="hldMode"]:checked');
+    return h ? h.value : 'HLD';
 }
 
 // Tab switching
@@ -718,8 +798,26 @@ async function loadGraphData() {
     if (!currentAnalysisId) return;
     
     try {
-        const response = await fetch(`/api/analysis/${currentAnalysisId}/graph`);
-        currentGraphData = await response.json();
+        const url = currentTopView === 'HLD' 
+            ? `/api/analysis/${currentAnalysisId}/hld_graph`
+            : `/api/analysis/${currentAnalysisId}/graph`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!data || data.error) {
+            throw new Error(data?.error || 'Invalid graph response');
+        }
+        currentGraphData = data;
+
+        // Populate HLD kind filters if in HLD view
+        if (currentTopView === 'HLD') {
+            const kinds = (currentGraphData.metadata && currentGraphData.metadata.kinds) || [];
+            const kf = document.getElementById('hldKindFilters');
+            if (kf) {
+                kf.innerHTML = kinds.map(k => `<button type="button" class="toolbar-btn" data-kind="${k}">${k}</button>`).join(' ');
+                // default: none selected = show all
+                hldSelectedKinds.clear();
+            }
+        }
         
         // Show graph
         elements.emptyState.style.display = 'none';
@@ -765,10 +863,14 @@ function showEdgeDetails(edgeData) {
     const tgt = cy.getElementById(edgeData.target).data();
     elements.nodeDetailsTitle.textContent = 'Connection Details';
     const examples = edgeData.metadata?.examples || [];
+    const intent = edgeData.metadata?.intent || [];
     const items = [];
     items.push(`<div class="detail-item"><span class="detail-label">Type:</span> <span class="detail-value">${edgeData.type || ''}</span></div>`);
     items.push(`<div class="detail-item"><span class="detail-label">From:</span> <span class="detail-value">${src.label}</span></div>`);
     items.push(`<div class="detail-item"><span class="detail-label">To:</span> <span class="detail-value">${tgt.label}</span></div>`);
+    if (intent.length) {
+        items.push(`<div class="detail-item"><span class="detail-label">Actions/Data:</span> <span class="detail-value">${intent.join(', ')}</span></div>`);
+    }
     if (examples.length) {
         items.push(`<div class="detail-item"><span class="detail-label">Examples:</span><pre class="detail-value">${examples.map(e => JSON.stringify(e, null, 2)).join('\n\n')}</pre></div>`);
     }
@@ -785,6 +887,27 @@ function showNodeDetails(node) {
     
     if (node.metadata?.purpose) {
         details.push(`<div class="detail-item"><span class="detail-label">Purpose:</span> <span class="detail-value">${node.metadata.purpose}</span></div>`);
+    }
+    // Show routes if present (API nodes)
+    if (node.metadata?.routes && node.metadata.routes.length) {
+        const rows = node.metadata.routes.map(r => `${r.method} ${r.path} → ${r.handler}`);
+        details.push(`<div class="detail-item"><span class="detail-label">Routes:</span> <span class="detail-value">${rows.join('<br>')}</span></div>`);
+    }
+
+    // Connections summary (incoming/outgoing by type)
+    if (cy) {
+        const ele = cy.getElementById(node.id);
+        if (ele && ele.length) {
+            const incoming = ele.incomers('edge');
+            const outgoing = ele.outgoers('edge');
+            const sum = (edges) => {
+                const m = {};
+                edges.forEach(e => { const t = e.data('type') || ''; m[t] = (m[t]||0)+1;});
+                return Object.entries(m).map(([k,v]) => `${k}: ${v}`).join(', ');
+            };
+            details.push(`<div class="detail-item"><span class="detail-label">Incoming:</span> <span class="detail-value">${sum(incoming)}</span></div>`);
+            details.push(`<div class="detail-item"><span class="detail-label">Outgoing:</span> <span class="detail-value">${sum(outgoing)}</span></div>`);
+        }
     }
     
     if (node.metadata?.complexity) {
@@ -868,9 +991,9 @@ function showExportSection() {
 }
 
 function updateStatistics(data) {
-    if (!data || !data.statistics) return;
-    
-    const stats = data.statistics;
+    if (!data) return;
+    const stats = data.statistics || data.metadata?.statistics;
+    if (!stats) return;
     elements.filesAnalyzed.textContent = stats.total_files || 0;
     elements.coveragePercent.textContent = `${(stats.coverage_percentage || 0).toFixed(1)}%`;
     elements.hldNodes.textContent = stats.business_nodes || stats.hld_nodes || 0;
@@ -881,9 +1004,9 @@ function updateStatistics(data) {
 }
 
 function updateComponentHealth(data) {
-    if (!data || !data.statistics) return;
-    
-    const stats = data.statistics;
+    if (!data) return;
+    const stats = data.statistics || data.metadata?.statistics;
+    if (!stats) return;
     
     // Calculate health metrics based on analysis data
     const codeQuality = calculateCodeQuality(stats);

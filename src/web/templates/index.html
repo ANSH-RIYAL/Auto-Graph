@@ -250,6 +250,13 @@
                             </div>
                         </div>
                         <div class="controls-section">
+                            <div class="toggle-controls" style="margin-right:16px;">
+                                <div class="depth-label">View:</div>
+                                <div class="btn-group" role="group" aria-label="View Toggle">
+                                    <button class="toolbar-btn" id="viewBSI" title="Business/System/Implementation">BSI</button>
+                                    <button class="toolbar-btn" id="viewHLD" title="HLD/LLD Modes">HLD/LLD</button>
+                                </div>
+                            </div>
                             <div class="depth-controls">
                                 <div class="depth-label">Technical Depth:</div>
                                 <div class="slider-container">
@@ -266,6 +273,14 @@
                                 <label style="margin-right:10px;"><input type="checkbox" id="filterContains" checked> Contains</label>
                                 <label style="margin-right:10px;"><input type="checkbox" id="filterDepends"> Depends On</label>
                                 <label style="margin-right:10px;"><input type="checkbox" id="filterCalls"> Calls</label>
+                            </div>
+                            <div class="hld-controls" id="hldControls" style="margin-left:16px; display:none;">
+                                <div class="depth-label">HLD/LLD:</div>
+                                <label style="margin-right:10px;"><input type="radio" name="hldMode" id="hldModeHLD" value="HLD" checked> HLD</label>
+                                <label style="margin-right:10px;"><input type="radio" name="hldMode" id="hldModeLLD" value="LLD"> LLD</label>
+                                <label style="margin-right:10px;"><input type="radio" name="hldMode" id="hldModeAll" value="ALL"> Complete</label>
+                                <span style="margin-left:16px;" class="depth-label">Kinds:</span>
+                                <span id="hldKindFilters" style="display:inline-flex; gap:8px; flex-wrap:wrap;"></span>
                             </div>
                         </div>
                     </div>
