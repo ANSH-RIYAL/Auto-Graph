@@ -48,10 +48,14 @@ MIN_DEPENDS_WEIGHT = 3
 TOP_IMPL_REPRESENTATIVES = 3
 
 import re
+from dotenv import load_dotenv
 try:
     from openai import OpenAI
 except Exception:
     OpenAI = None
+
+# Load environment variables (e.g., OPENAI_API_KEY) from .env if present
+load_dotenv()
 
 def _extract_flask_routes(codebase_dir: str):
     routes = []
@@ -159,7 +163,8 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
     business.sort(key=lambda n: n.get('name',''))
     col = 350
     # 12 vertical layers: Business top (1), Systems (2..6), Implementation/Clusters (7..12)
-    rowvals = [120, 260, 320, 380, 440, 500, 620, 700, 780, 860, 940, 1020]
+    # Increased spacing for clearer separation between levels
+    rowvals = [140, 420, 560, 700, 840, 980, 1180, 1320, 1460, 1600, 1740, 1880]
     row = {i+1: y for i, y in enumerate(rowvals)}
     bx = {}
     for i, bn in enumerate(business):
@@ -238,7 +243,7 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
             if other:
                 keep['other'] = other
             buckets = keep
-        # Create cluster nodes (only if at least 2 members)
+        # Create cluster nodes (only if at least 2 members); skip creating cluster when the bucket corresponds to a SYSTEM node (we never wrap systems)
         for k, members in buckets.items():
             if len(members) < 2:
                 continue
@@ -297,7 +302,7 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
           spacing_y = 90.0
           width = (cols - 1) * spacing_x + 2 * 80.0
           center_x = cursor_x + width / 2.0
-           line_y = layers[layer_index % len(layers)]
+          line_y = layers[layer_index % len(layers)]
           clusters_map[cid]['position'] = {'x': center_x, 'y': line_y}
           cursor_x += width + gap
           layer_index += 1
@@ -329,7 +334,7 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
                   sn['position']['x'] = (lo + hi) / 2.0
                   sys_center_x[sn['id']] = sn['position']['x']
 
-           # Business x is average of its system children x (use original contains edges; clusters handled later)
+          # Business x is average of its system children x (use original contains edges; clusters handled later)
           sys_parent = { e['to_node']: e['from_node'] for e in contains_edges if by_id.get(e['from_node'],{}).get('level')=='BUSINESS' and by_id.get(e['to_node'],{}).get('level')=='SYSTEM' }
           bus_to_sys = defaultdict(list)
           for sid, bid in sys_parent.items():
@@ -665,7 +670,7 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
         targets = [n for n in nodes if n.get('level') in ('BUSINESS','SYSTEM')]
         # Also prepare clusters missing description
         clusters_to_describe = [n for n in nodes if n.get('type')=='Cluster' and not ((n.get('metadata') or {}).get('description'))]
-        if (targets or clusters_to_describe) and OpenAI and os.environ.get('OPENAI_API_KEY'):
+        if OpenAI and os.environ.get('OPENAI_API_KEY'):
             client = OpenAI()
             for n in targets:
                 brief = {
@@ -699,7 +704,7 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
                 }
                 prompt = (
                     'Write a clear two-line English description of this implementation cluster for a PM. '
-                    'Line 1: what the group represents; Line 2: examples (by id).\n' + json.dumps(context)
+                    'Line 1: what the group represents; Line 2: examples (by id). Return text only.\n' + json.dumps(context)
                 )
                 try:
                     resp = client.chat.completions.create(model=os.environ.get('OPENAI_MODEL','gpt-4o-mini'),
@@ -710,13 +715,17 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
                     md = n.get('metadata') or {}
                     if desc:
                         md['description'] = desc
+                        # also upgrade generic cluster name if very mechanical
+                        base_name = (n.get('name') or '')
+                        if base_name.lower().startswith('cluster_') or 'cluster' in base_name.lower():
+                            # Derive a concise name from first sentence
+                            short = desc.split('\n')[0].strip('.')
+                            n['name'] = short[:60]
                         n['metadata'] = md
                 except Exception:
                     pass
         else:
-            # Explicit log so it's clear when LLM is skipped
-            if not os.environ.get('OPENAI_API_KEY'):
-                logger.warning('OPENAI_API_KEY not set; skipping LLM naming/description step.')
+            logger.error('OpenAI client unavailable despite required LLM step. Ensure openai package is installed.')
     except Exception:
         pass
 
