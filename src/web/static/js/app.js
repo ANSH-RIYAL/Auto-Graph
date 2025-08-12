@@ -184,15 +184,27 @@ function initializeCytoscape() {
                     'border-width': 3,
                     'border-color': '#2c3e50',
                     'shape': 'roundrectangle',
-                    'width': 120,
-                    'height': 60,
-                    'font-size': '12px',
+                    'width': 'mapData(sizeFactor, 1, 8, 100, 420)',
+                    'height': 'mapData(sizeFactor, 1, 8, 50, 220)',
+                    'font-size': 'mapData(sizeFactor, 1, 8, 14, 24)',
                     'font-weight': 'bold',
                     'text-wrap': 'wrap',
-                    'text-max-width': '100px',
+                    'text-max-width': 'mapData(sizeFactor, 1, 8, 120, 360)',
                     'text-outline-width': 2,
                     'text-outline-color': '#2c3e50',
                     'text-outline-opacity': 0.8,
+                    'opacity': 1
+                }
+            },
+            {
+                selector: 'node[type = "Cluster"]',
+                style: {
+                    'shape': 'round-rectangle',
+                    'background-color': 'data(clusterColor)',
+                    'border-color': '#000000',
+                    'border-width': 2,
+                    'padding': 24,
+                    'compound-sizing-wrt-labels': 'exclude',
                     'opacity': 1
                 }
             },
@@ -249,16 +261,18 @@ function initializeCytoscape() {
                     'opacity': 0.2
                 }
             },
-            { selector: 'edge[type = "contains"]', style: { 'line-color': '#27ae60', 'target-arrow-color': '#27ae60' } },
-            { selector: 'edge[type = "depends_on"]', style: { 'line-color': '#2980b9', 'target-arrow-color': '#2980b9', 'line-style': 'dashed' } },
-            { selector: 'edge[type = "calls"]', style: { 'line-color': '#e67e22', 'target-arrow-color': '#e67e22', 'line-style': 'dotted' } },
+            { selector: 'edge[type = "contains"]', style: { 'line-color': '#22C55E', 'target-arrow-color': '#22C55E', 'width': 20 } },
+            { selector: 'edge[type = "depends_on"]', style: { 'line-color': '#3B82F6', 'target-arrow-color': '#3B82F6', 'line-style': 'dashed', 'width': 20 } },
+            { selector: 'edge[type = "calls"]', style: { 'line-color': '#F59E0B', 'target-arrow-color': '#F59E0B', 'line-style': 'dotted', 'width': 20 } },
+            { selector: 'edge[level = "BUSINESS"]', style: { 'width': 40 } },
+            { selector: 'edge[level = "SYSTEM"]', style: { 'width': 20 } },
             {
                 selector: 'edge:selected',
                 style: {
                     'opacity': 1,
-                    'line-color': '#2c3e50',
-                    'target-arrow-color': '#2c3e50',
-                    'width': 5
+                    'line-color': 'data(color)',
+                    'target-arrow-color': 'data(color)',
+                    'width': 6
                 }
             },
             {
@@ -477,14 +491,18 @@ function displayGraph() {
     
     // Single deterministic rendering path: always use server-provided positions
     filteredNodes.forEach(node => {
-        const nodeColor = node.metadata?.color || moduleColors[node.id] || '#f0f0f0';
+        const nodeColor = node.metadata?.color || moduleColors[node.id] || '#4b5563';
+        const clusterColor = node.type === 'Cluster' ? (node.color || 'rgba(99,102,241,0.08)') : undefined;
         elements.push({
             data: {
                 id: node.id,
                 label: node.name || node.id,
                 type: node.type,
                 level: node.level,
-                color: nodeColor
+                color: nodeColor,
+                clusterColor,
+                sizeFactor: node.metadata?.size_factor || 1,
+                parent: node.parent || undefined
             },
             position: node.position || { x: 0, y: 0 }
         });
@@ -500,14 +518,25 @@ function displayGraph() {
         if (t === 'contains' && !showContains) return;
         if ((t === 'depends_on' || t === 'depends') && !showDepends) return;
         if (t === 'calls' && !showCalls) return;
+        // Filter: no edges involving raw Implementation nodes
+        const srcNode = filteredNodes.find(n => n.id === edge.from_node);
+        const dstNode = filteredNodes.find(n => n.id === edge.to_node);
+        const isImpl = (n) => n && n.level === 'IMPLEMENTATION' && n.type !== 'Cluster';
+        if (isImpl(srcNode) || isImpl(dstNode)) return;
+        // Also skip Business -> Cluster contains (server prunes, but double-guard in UI)
+        if (t === 'contains' && srcNode && dstNode && srcNode.level === 'BUSINESS' && dstNode.type === 'Cluster') return;
         const edgeKey = edge.id || `${edge.from_node}-${edge.to_node}`;
+        const levelWidth = (lvl) => (lvl === 'BUSINESS' ? 8 : (lvl === 'SYSTEM' ? 4 : 2));
+        const src = srcNode || {};
         elements.push({
             data: {
                 id: edgeKey,
                 source: edge.from_node,
                 target: edge.to_node,
                 label: edge.metadata?.relationship_type || edge.type || '',
-                type: edge.type
+                type: edge.type,
+                color: (t==='contains') ? '#22C55E' : (t==='depends_on' ? '#3B82F6' : '#F59E0B'),
+                level: src.level || 'SYSTEM'
             }
         });
     });

@@ -20,7 +20,7 @@
 ## Visualization-Graph Conversion Prompt (LLM)
 
 System (prepend):
-"You convert an AST graph into a standardized visualization-graph. Do not invent edges or nodes that are not traceable. You may rename, summarize, and fill kind_specific fields. Keep positions and edges unchanged. Output JSON ONLY conforming to the schema. Temperature 0.1."
+"You convert an AST graph into a standardized visualization-graph. Do not invent edges or nodes. You may rename, summarize, and fill kind_specific fields. Keep ids, edges, and positions unchanged. Output JSON ONLY conforming to the schema. Temperature 0.1."
 
 User (template to fill):
 "Schema:\n<PASTE SCHEMA>\n\nInitial viz draft (immutable edges/positions):\n<PASTE INITIAL VIZ JSON>\n\nTask: Improve naming, summaries, responsibilities, interfaces, domain_tags, and kind_specific fields. Do not alter edges, ids, or positions."
@@ -44,10 +44,11 @@ User (template to fill):
 
 ## Analysis Prompts
 
-### Business Label Summarization (optional LLM assist)
+### Business/System Summarization (schema-locked)
 "Given the following cluster summary (files, primary imports, centrality), provide a concise business-facing label and one-sentence purpose. Avoid implementation jargon."
 
 Inputs: `files[]`, `top_imports[]`, `neighbors[]`, `sample_symbols[]`.
+Allowed fields to edit: `name`, `purpose`, `responsibilities[3-5]`, `interfaces[2-4]`, `top_dependencies[<=3]`.
 
 ### Risk/Agent Detection Prompt
 "Scan this file for AI agent usage (OpenAI/LangChain/Anthropic/etc.). If found, summarize purpose and business impact in one sentence; assign risk: high/medium/low."

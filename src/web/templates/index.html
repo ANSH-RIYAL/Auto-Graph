@@ -254,7 +254,7 @@
                                 <div class="depth-label">View:</div>
                                 <div class="btn-group" role="group" aria-label="View Toggle">
                                     <button class="toolbar-btn" id="viewBSI" title="Business/System/Implementation">BSI</button>
-                                    <button class="toolbar-btn" id="viewHLD" title="HLD/LLD Modes">HLD/LLD</button>
+                                    <button class="toolbar-btn" id="viewHLD" title="Conceptual Architecture">Conceptual</button>
                                 </div>
                             </div>
                             <div class="depth-controls">
@@ -275,12 +275,12 @@
                                 <label style="margin-right:10px;"><input type="checkbox" id="filterCalls"> Calls</label>
                             </div>
                             <div class="hld-controls" id="hldControls" style="margin-left:16px; display:none;">
-                                <div class="depth-label">HLD/LLD:</div>
-                                <label style="margin-right:10px;"><input type="radio" name="hldMode" id="hldModeHLD" value="HLD" checked> HLD</label>
-                                <label style="margin-right:10px;"><input type="radio" name="hldMode" id="hldModeLLD" value="LLD"> LLD</label>
-                                <label style="margin-right:10px;"><input type="radio" name="hldMode" id="hldModeAll" value="ALL"> Complete</label>
+                                <div class="depth-label">Filters:</div>
                                 <span style="margin-left:16px;" class="depth-label">Kinds:</span>
                                 <span id="hldKindFilters" style="display:inline-flex; gap:8px; flex-wrap:wrap;"></span>
+                                <span style="margin-left:16px;" class="depth-label">Min Dep Weight:</span>
+                                <input type="range" id="hldMinWeight" min="1" max="50" value="3" style="vertical-align: middle;">
+                                <span id="hldMinWeightLabel">3</span>
                             </div>
                         </div>
                     </div>

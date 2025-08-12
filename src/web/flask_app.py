@@ -8,6 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 import tempfile
 import zipfile
+import hashlib
 import shutil
 
 # Add the src directory to the path so we can import our modules
@@ -43,6 +44,8 @@ analysis_results = {}
 analysis_sessions = {}
 
 TOP_N_DEPENDS = 5
+MIN_DEPENDS_WEIGHT = 3
+TOP_IMPL_REPRESENTATIVES = 3
 
 import re
 try:
@@ -115,6 +118,8 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
     for sa, lst in per_src.items():
         lst.sort(key=lambda x: (-x[1], x[0]))
         for sb, w in lst[:TOP_N_DEPENDS]:
+            if int(w) < MIN_DEPENDS_WEIGHT:
+                continue
             dep_edges.append({
                 'id': f'{sa}->{sb}#dep',
                 'from_node': sa,
@@ -136,7 +141,7 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
     ]
     merged_edges = [e for e in edges if str(e.get('type','')).lower() == 'contains'] + dep_edges + call_edges
 
-    # Layout: six rows, degree-centered ordering
+    # Layout: preset with 12 rows (1/3/8 bands) and degree-centered ordering
     business = [n for n in nodes if n.get('level') == 'BUSINESS']
     system = [n for n in nodes if n.get('level') == 'SYSTEM']
     impl = [n for n in nodes if n.get('level') == 'IMPLEMENTATION']
@@ -151,9 +156,9 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
     deg = degree_map(merged_edges)
     business.sort(key=lambda n: n.get('name',''))
     col = 350
-    # 12 vertical layers to improve readability
+    # 12 vertical layers to improve readability with larger Business→System gap
     # 12 rows total: Business 1, System 3, Implementation 8
-    rowvals = [120, 200, 280, 360, 440, 520, 600, 680, 760, 840, 920, 1000]
+    rowvals = [120, 340, 420, 500, 580, 660, 740, 820, 900, 980, 1060, 1140]
     row = {i+1: y for i, y in enumerate(rowvals)}
     bx = {}
     for i, bn in enumerate(business):
@@ -186,19 +191,312 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
     for sp, group in impl_groups.items():
         cx = sx.get(sp, 200)
         group.sort(key=lambda n: (-deg.get(n['id'],0), n.get('name','')))
+        # Grid columns under each system to avoid overlap
+        col_w = 140
+        start_x = cx - (len(group)-1)/2.0 * col_w
         for k, inn in enumerate(group):
-            off = (k-(len(group)-1)/2.0)*140
+            x_pos = start_x + k*col_w
             # place over 8 rows (5..12)
             y_index = 5 + (k % 8)
             y = row[y_index]
-            inn['position'] = {'x': cx+off, 'y': y}
+            inn['position'] = {'x': x_pos, 'y': y}
 
-    # Ensure no blank summaries (placeholder)
+    # Implementation clustering (post-generation visual grouping)
+    def slug(s: str) -> str:
+        return ''.join(c.lower() if c.isalnum() else '_' for c in (s or 'cluster')).strip('_')[:40]
+
+    cluster_nodes = []
+    impl_to_cluster = {}
+    # Skip clustering if too few system nodes overall
+    do_cluster = len(system) > 5
+    # For each system, group implementations by nearest directory token in their primary file path
+    if do_cluster:
+      def cluster_color(cid: str) -> str:
+          h = int(hashlib.md5(cid.encode('utf-8')).hexdigest()[:6], 16) % 360
+          return f"hsla({h}, 70%, 60%, 0.10)"
+      sys_index = 0
+      for sid, group in impl_groups.items():
+        buckets = {}
+        for n in group or []:
+            fp = (n.get('files') or [''])[0]
+            parts = Path(fp).parts
+            key = None
+            # Prefer last directory before filename
+            if len(parts) >= 2:
+                key = parts[-2]
+            key = key or 'misc'
+            buckets.setdefault(key, []).append(n)
+        # If too many tiny buckets, merge smallest into 'other'
+        if len(buckets) > 20:
+            # keep top 15 by size, merge rest
+            items = sorted(buckets.items(), key=lambda kv: -len(kv[1]))
+            keep = dict(items[:15])
+            other = []
+            for k, v in items[15:]:
+                other.extend(v)
+            if other:
+                keep['other'] = other
+            buckets = keep
+        # Create cluster nodes (only if at least 2 members)
+        for k, members in buckets.items():
+            if len(members) < 2:
+                continue
+            cid = f"cluster_{sid}_{slug(k)}"
+            member_ids = [m['id'] for m in members]
+            cluster_nodes.append({
+                'id': cid,
+                'name': f"{k.title()} Cluster",
+                'type': 'Cluster',
+                'level': 'IMPLEMENTATION',
+                'metadata': {
+                    'cluster': True,
+                    'members': member_ids,
+                    'counts': {'members': len(member_ids)},
+                    'purpose': f"Group of {len(member_ids)} closely related implementation elements in '{k}'."
+                },
+                'position': {'x': sx.get(sid, 200), 'y': row[9]},  # place lower band
+                'color': cluster_color(cid)
+            })
+            for mid in member_ids:
+                impl_to_cluster[mid] = cid
+        sys_index += 1
+    # assign parent for impl nodes to enable compound bounding boxes on frontend
+    if do_cluster:
+      # Assign parents and compute tight grid placement per cluster
+      clusters_map = { c['id']: c for c in cluster_nodes }
+      members_by_cluster = defaultdict(list)
+      for n in impl:
+          cid = impl_to_cluster.get(n['id'])
+          if cid:
+              n['parent'] = cid
+              members_by_cluster[cid].append(n)
+      # Arrange clusters side-by-side in a single horizontal line and pack children grids
+      # Order clusters by size (desc) to allocate space first to larger ones
+      ordered = sorted(members_by_cluster.items(), key=lambda item: -len(item[1]))
+      line_y = row[11]
+      cursor_x = 200.0
+      gap = 80.0
+      for cid, members in ordered:
+          count = len(members)
+          cols = int(max(2, round(count ** 0.5)))
+          rows = int((count + cols - 1) // cols)
+          spacing_x = 120.0
+          spacing_y = 80.0
+          width = (cols - 1) * spacing_x + 2 * 80.0
+          center_x = cursor_x + width / 2.0
+          clusters_map[cid]['position'] = {'x': center_x, 'y': line_y}
+          cursor_x += width + gap
+
+          # Start grid centered inside cluster
+          start_x = center_x - (cols - 1) * spacing_x / 2.0
+          start_y = line_y - (rows - 1) * spacing_y / 2.0
+          for idx, child in enumerate(sorted(members, key=lambda n: n.get('name') or n['id'])):
+              r = idx // cols; c = idx % cols
+              child['position'] = {'x': start_x + c * spacing_x, 'y': start_y + r * spacing_y}
+
+      # Re-anchor systems and business nodes to centers of their cluster ranges
+      if members_by_cluster:
+          sys_to_centers = defaultdict(list)
+          for cid, mems in members_by_cluster.items():
+              # cluster id format cluster_<systemId>_...
+              parts = cid.split('_')
+              sid = parts[1] if len(parts) > 2 else None
+              if sid and cid in clusters_map:
+                  sys_to_centers[sid].append(clusters_map[cid]['position']['x'])
+
+          sys_center_x = {}
+          for sn in system:
+              centers = sys_to_centers.get(sn['id'])
+              if centers:
+                  sn['position']['x'] = sum(centers) / len(centers)
+                  sys_center_x[sn['id']] = sn['position']['x']
+
+          # Business x is average of its system children x
+          sys_parent = { e['to_node']: e['from_node'] for e in new_contains if by_id.get(e['from_node'],{}).get('level')=='BUSINESS' and by_id.get(e['to_node'],{}).get('level')=='SYSTEM' }
+          bus_to_sys = defaultdict(list)
+          for sid, bid in sys_parent.items():
+              bus_to_sys[bid].append(sid)
+          for bn in business:
+              xs = [sys_center_x[s] for s in bus_to_sys.get(bn['id'], []) if s in sys_center_x]
+              if xs:
+                  bn['position']['x'] = sum(xs) / len(xs)
+
+    # Replace system→implementation contains with system→cluster; keep cluster→impl contains for drill-down
+    contains_edges = [e for e in edges if str(e.get('type','')).lower() == 'contains']
+    new_contains = []
+    if do_cluster:
+      for e in contains_edges:
+          f = e.get('from_node'); t = e.get('to_node')
+          if by_id.get(f, {}).get('level') == 'SYSTEM' and by_id.get(t, {}).get('level') == 'IMPLEMENTATION':
+              cid = impl_to_cluster.get(t)
+              if cid:
+                  new_contains.append({'id': f"{f}->{cid}#contains","from_node": f, "to_node": cid, "type": 'contains', 'metadata': {}})
+                  # also keep cluster→impl
+                  new_contains.append({'id': f"{cid}->{t}#contains","from_node": cid, "to_node": t, "type": 'contains', 'metadata': {}})
+              else:
+                  new_contains.append(e)
+          else:
+              new_contains.append(e)
+    else:
+      new_contains = contains_edges
+
+    # Roll up implementation calls into cluster-level depends_on
+    cluster_weights = defaultdict(int)
+    cluster_dep_edges = []
+    if do_cluster:
+      for ce in call_edges:
+          a = ce['from_node']; b = ce['to_node']
+          ca = impl_to_cluster.get(a); cb = impl_to_cluster.get(b)
+          if ca and cb and ca != cb:
+              cluster_weights[(ca, cb)] += 1
+      for (ca, cb), w in cluster_weights.items():
+          cluster_dep_edges.append({'id': f"{ca}->{cb}#cdep", 'from_node': ca, 'to_node': cb, 'type': 'depends_on', 'metadata': {'weight': int(w)}})
+
+    # Aggregate system members, representatives, and provenance
+    sys_members = {sn['id']: { 'files': [], 'classes': [], 'functions': [], 'counts': {'files':0,'classes':0,'functions':0}, 'ast_ids': [] } for sn in system}
+    # Heuristic fallback mapping when contains links are missing
+    def fallback_system_for_impl(impl_node):
+        name = (impl_node.get('name') or impl_node.get('id','')).lower()
+        files = impl_node.get('files', []) or []
+        joined = ' '.join(files).lower()
+        best_id = None; best_score = -1
+        for sysn in system:
+            nm = (sysn.get('name') or sysn.get('id','')).lower()
+            score = 0
+            if any(k in joined or k in name for k in ['model','schema']):
+                score += 3 if ('schema' in nm or 'model' in nm) else 0
+            if any(k in joined or k in name for k in ['control']):
+                score += 3 if 'control' in nm else 0
+            if any(k in joined or k in name for k in ['component','ui']):
+                score += 3 if ('component' in nm or 'ui' in nm) else 0
+            if any(k in joined or k in name for k in ['actions','action','/actions/']):
+                score += 3 if 'action' in nm else 0
+            if any(k in joined for k in ['/data/','/io/','io.py']):
+                score += 2 if ('data' in nm or 'io' in nm) else 0
+            if 'integrations' in joined:
+                score += 3 if 'integration' in nm else 0
+            if 'manager' in joined:
+                score += 1 if 'manager' in nm else 0
+            if score > best_score:
+                best_score = score; best_id = sysn['id']
+        return best_id if best_score > 0 else None
+
+    for inn in impl:
+        sid = system_ancestor(inn['id']) or fallback_system_for_impl(inn)
+        if not sid or sid not in sys_members:
+            continue
+        memb = sys_members[sid]
+        memb['files'].extend(inn.get('files', []) or [])
+        memb['classes'].extend(inn.get('classes', []) or [])
+        memb['functions'].extend(inn.get('functions', []) or [])
+        memb['ast_ids'].append(inn['id'])
+    for sid, memb in sys_members.items():
+        memb['counts'] = {
+            'files': len(memb['files']),
+            'classes': len(memb['classes']),
+            'functions': len(memb['functions'])
+        }
+    # Representatives: top-K implementation children by degree
+    sys_children = {sn['id']: [] for sn in system}
+    for inn in impl:
+        sid = system_ancestor(inn['id'])
+        if sid in sys_children:
+            sys_children[sid].append(inn)
+    sys_reps = {}
+    for sid, childs in sys_children.items():
+        childs.sort(key=lambda n: (-deg.get(n['id'],0), n.get('name','')))
+        sys_reps[sid] = [c['id'] for c in childs[:TOP_IMPL_REPRESENTATIVES]]
+    # Attach to system nodes
+    for sn in system:
+        md = sn.get('metadata') or {}
+        md['members'] = {
+            'files': sys_members[sn['id']]['files'][:50],
+            'classes': sys_members[sn['id']]['classes'][:50],
+            'functions': sys_members[sn['id']]['functions'][:50],
+            'counts': sys_members[sn['id']]['counts']
+        }
+        md['representatives'] = sys_reps.get(sn['id'], [])
+        md['provenance'] = { 'ast_ids': sys_members[sn['id']]['ast_ids'][:200] }
+        # Module facts placeholders
+        facts = md.get('facts') or {
+            'routes': [], 'io_ops': [], 'db_ops': [], 'http_calls': [],
+            'cache_ops': [], 'queue_ops': [], 'pubsub_ops': [],
+            'external_calls': [], 'entrypoints': []
+        }
+        md['facts'] = facts
+        sn['metadata'] = md
+
+    # Visual styling metadata: size factors and colors
+    level_to_factor = { 'BUSINESS': 8, 'SYSTEM': 4, 'IMPLEMENTATION': 1 }
+    # Diverse but sober palette; keyed by type fallback to level colors
+    type_palette = {
+        'API': '#3B82F6',
+        'Service': '#EF4444',
+        'Module': '#6366F1',
+        'Database': '#14B8A6',
+        'Cache': '#22C55E',
+        'Message_Bus': '#F59E0B',
+        'Queue': '#F97316',
+        'Scheduler': '#EAB308',
+        'Storage': '#8B5CF6',
+        'Search': '#06B6D4',
+        'External': '#64748B',
+        'Actor': '#0EA5E9'
+    }
+    level_palette = { 'BUSINESS': '#0EA5E9', 'SYSTEM': '#3B82F6', 'IMPLEMENTATION': '#94A3B8' }
+    for n in nodes:
+        md = n.get('metadata') or {}
+        lvl = n.get('level', 'IMPLEMENTATION')
+        md['size_factor'] = level_to_factor.get(lvl, 1)
+        ntype = n.get('type') or ''
+        md['color'] = type_palette.get(ntype, level_palette.get(lvl, '#94A3B8'))
+        # Add paths alias for UI/exports
+        if (n.get('files') or []) and 'paths' not in md:
+            md['paths'] = list(n.get('files') or [])
+        n['metadata'] = md
+
+    # Ensure no blank summaries (placeholder) and one-line English for impl reps
+    rep_ids = set()
+    for rlist in sys_reps.values():
+        rep_ids.update(rlist)
     for n in nodes:
         md = n.get('metadata') or {}
         if not md.get('purpose'):
             md['purpose'] = 'information missing'
-            n['metadata'] = md
+        if n.get('level') == 'IMPLEMENTATION' and n.get('id') in rep_ids:
+            # simple one-line description
+            desc = md.get('purpose')
+            if not desc or desc == 'information missing':
+                kind = n.get('type') or 'Symbol'
+                path = (n.get('files') or [''])[0]
+                md['purpose'] = f"{kind} implemented at {path}"
+        n['metadata'] = md
+
+    # Prune Business->Implementation 'contains' when Business->System->Implementation exists
+    try:
+        node_by_id = { n['id']: n for n in nodes }
+        contains = [e for e in merged_edges if e['type'] == 'contains']
+        children_of = defaultdict(set)
+        for e in contains:
+            children_of[e['from_node']].add(e['to_node'])
+        prune_pairs = set()
+        for e in contains:
+            f = e['from_node']; t = e['to_node']
+            if node_by_id.get(f,{}).get('level') == 'BUSINESS' and node_by_id.get(t,{}).get('level') == 'IMPLEMENTATION':
+                for s in children_of.get(f, set()):
+                    if node_by_id.get(s,{}).get('level') == 'SYSTEM' and t in children_of.get(s, set()):
+                        prune_pairs.add((f,t)); break
+        if prune_pairs:
+            merged_edges = [e for e in merged_edges if not (e['type']=='contains' and (e['from_node'], e['to_node']) in prune_pairs)]
+    except Exception:
+        pass
+
+    # Append cluster nodes and edges (from previous step)
+    if do_cluster and cluster_nodes:
+        nodes.extend(cluster_nodes)
+        # Replace contains set
+        non_contains = [e for e in merged_edges if e['type'] != 'contains']
+        merged_edges = new_contains + non_contains + cluster_dep_edges
 
     # External/User stubs and API routes
     sys_api = next((n for n in nodes if n.get('level')=='SYSTEM' and 'api' in n.get('name','').lower()), None)
@@ -235,6 +533,68 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
     except Exception:
         pass
 
+    # Populate module facts by scanning files of implementation nodes and attributing to system parents
+    try:
+        # Quick maps
+        sys_meta = { sn['id']: (sn.get('metadata') or {}) for sn in system }
+        # Initialize facts structures
+        for sid, md in sys_meta.items():
+            md.setdefault('facts', {
+                'routes': md.get('routes', []),
+                'io_ops': [], 'db_ops': [], 'http_calls': [],
+                'cache_ops': [], 'queue_ops': [], 'pubsub_ops': [],
+                'external_calls': [], 'entrypoints': []
+            })
+        # Helper to append unique (bounded)
+        def add_fact(sid, key, item, cap=50):
+            if not sid or sid not in sys_meta: return
+            arr = sys_meta[sid]['facts'].setdefault(key, [])
+            if item not in arr:
+                if len(arr) < cap:
+                    arr.append(item)
+        # Iterate impl nodes
+        for inn in impl:
+            sid = system_ancestor(inn['id']) or fallback_system_for_impl(inn)
+            if not sid: continue
+            for fp in (inn.get('files') or []):
+                p = os.path.join(codebase_dir or '.', fp)
+                try:
+                    with open(p, 'r', encoding='utf-8', errors='ignore') as fh:
+                        txt = fh.read(20000)
+                except Exception:
+                    continue
+                low = txt.lower()
+                # IO ops
+                if 'read_csv' in low: add_fact(sid, 'io_ops', {'read_csv': fp})
+                if 'to_csv' in low or 'write' in low: add_fact(sid, 'io_ops', {'write': fp})
+                # DB ops
+                if 'sqlite3' in low or 'sqlalchemy' in low or 'session.query' in low:
+                    add_fact(sid, 'db_ops', {'op': 'query', 'file': fp})
+                # HTTP calls
+                if 'requests.' in low:
+                    add_fact(sid, 'http_calls', {'lib': 'requests', 'file': fp})
+                # Cache
+                if 'redis' in low:
+                    add_fact(sid, 'cache_ops', {'lib': 'redis', 'file': fp})
+                # Queue / PubSub
+                if 'rq.' in low or 'celery' in low:
+                    add_fact(sid, 'queue_ops', {'lib': 'rq/celery', 'file': fp})
+                if 'pika' in low:
+                    add_fact(sid, 'pubsub_ops', {'lib': 'pika', 'file': fp})
+                # External SDKs
+                if 'openai' in low:
+                    add_fact(sid, 'external_calls', {'sdk': 'openai', 'file': fp})
+                if 'plotly' in low or 'px.' in low:
+                    add_fact(sid, 'external_calls', {'sdk': 'plotly', 'file': fp})
+                # Entrypoints
+                if '__main__' in low:
+                    add_fact(sid, 'entrypoints', fp)
+        # Write back
+        for sn in system:
+            sn['metadata'] = sys_meta[sn['id']]
+    except Exception:
+        pass
+
     # Deterministic module descriptions (fallback when LLM absent)
     name_map = {n['id']: n.get('name') for n in nodes}
     out_edges = defaultdict(list)
@@ -260,11 +620,129 @@ def _build_viz_from_frontend(frontend: dict, codebase_dir: str = "") -> dict:
                 md['purpose'] = desc
             n['metadata'] = md
 
-    return {
-        'metadata': frontend.get('metadata', {}),
+    # Optional: LLM-based naming for bland names (BUSINESS/SYSTEM only)
+    try:
+        bland = []
+        for n in nodes:
+            if n.get('level') not in ('BUSINESS','SYSTEM'):
+                continue
+            name = (n.get('name') or '').strip()
+            if not name or name.startswith('system_') or name.startswith('business_') or name.lower() in {'service','module','domain','other','api layer','api'}:
+                bland.append(n)
+        if bland and OpenAI and os.environ.get('OPENAI_API_KEY'):
+            client = OpenAI()
+            for n in bland[:20]:
+                brief = {
+                    'id': n.get('id'),
+                    'level': n.get('level'),
+                    'type': n.get('type'),
+                    'files': n.get('files', [])[:5],
+                    'neighbors': sorted({ by_id.get(e['to_node'],{}).get('name') for e in out_edges.get(n['id'],[]) } | { by_id.get(e['from_node'],{}).get('name') for e in in_edges.get(n['id'],[]) })
+                }
+                prompt = (
+                    'Propose a concise, human-friendly name (3-5 words) for this software module. '
+                    'Only return the name as plain text.\n' + json.dumps(brief)
+                )
+                try:
+                    resp = client.chat.completions.create(model=os.environ.get('OPENAI_MODEL','gpt-4o-mini'),
+                                                          messages=[{'role':'system','content':'You name software modules clearly without adding extra text.'},
+                                                                    {'role':'user','content':prompt}],
+                                                          temperature=0.1, max_tokens=24)
+                    suggestion = (resp.choices[0].message.content or '').strip()
+                    if suggestion:
+                        n['name'] = suggestion
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # Enrich depends_on intents and top_calls
+    # Build quick name lookup
+    sys_name = { n['id']: (n.get('name') or '') for n in system }
+    # Index call edges by system pair
+    calls_by_pair = defaultdict(list)
+    for ce in call_edges:
+        a = ce['from_node']; b = ce['to_node']
+        sa = system_ancestor(a); sb = system_ancestor(b)
+        if sa and sb and sa != sb:
+            calls_by_pair[(sa,sb)].append(ce)
+    def infer_intent(sa_id: str, sb_id: str, sa_name: str, sb_name: str):
+        s = sa_name.lower(); t = sb_name.lower(); intents = []
+        # Use facts to drive mapping
+        sa_md = (by_id.get(sa_id, {}) or {}).get('metadata') or {}
+        sb_md = (by_id.get(sb_id, {}) or {}).get('metadata') or {}
+        sa_f = sa_md.get('facts') or {}; sb_f = sb_md.get('facts') or {}
+        if (sa_f.get('routes') or []) and (sb_f.get('http_calls') or []):
+            intents.append('http_request')
+        if sa_f.get('io_ops') or sb_f.get('io_ops'):
+            intents.append('read/write')
+        if sa_f.get('db_ops') or sb_f.get('db_ops'):
+            intents.append('db_access')
+        if sa_f.get('cache_ops') or sb_f.get('cache_ops'):
+            intents.append('cache_access')
+        if sa_f.get('queue_ops') or sb_f.get('queue_ops'):
+            intents.append('enqueue')
+        if sa_f.get('pubsub_ops') or sb_f.get('pubsub_ops'):
+            intents.append('publish/subscribe')
+        if sa_f.get('external_calls') or sb_f.get('external_calls'):
+            intents.append('external_integration')
+        # Name-based fallbacks
+        if 'control' in s and 'action' in t: intents.append('emit_events')
+        if 'component' in s and 'action' in t: intents.append('invoke_handlers')
+        if 'action' in s and ('data' in t or 'io' in t or 'schema' in t): intents.append('read/write')
+        if 'action' in s and 'component' in t: intents.append('update_ui')
+        if not intents: intents.append('depends')
+        return list(dict.fromkeys(intents))
+    for e in dep_edges:
+        sa = e['from_node']; sb = e['to_node']
+        e_md = e.get('metadata') or {}
+        pair_calls = calls_by_pair.get((sa,sb), [])
+        # sample top calls
+        samples = []
+        for ce in pair_calls[:3]:
+            src = by_id.get(ce['from_node'], {})
+            dst = by_id.get(ce['to_node'], {})
+            samples.append({
+                'from': src.get('name') or src.get('id'),
+                'to': dst.get('name') or dst.get('id')
+            })
+        if samples:
+            e_md['top_calls'] = samples
+        e_md['intent'] = infer_intent(sa, sb, sys_name.get(sa,''), sys_name.get(sb,''))
+        e['metadata'] = e_md
+
+    viz = {
+        'metadata': { **frontend.get('metadata', {}), 'layout': { 'rows': 12, 'bands': { 'business':[1], 'system':[2,3,4], 'implementation':[5,6,7,8,9,10,11,12] }, 'anchors_px': rowvals } },
         'nodes': nodes,
         'edges': merged_edges,
     }
+
+    # Also emit split artifacts: viz_core (no positions/colors), viz_layout
+    try:
+        project = Path(codebase_dir).parts[-1] or 'project'
+        out_dir = Path('graph') / project / 'exports'
+        out_dir.mkdir(parents=True, exist_ok=True)
+        # Core
+        core_nodes = []
+        layout_nodes = []
+        for n in nodes:
+            nd = dict(n)
+            vis = (nd.get('metadata') or {}).get('color')
+            pos = nd.pop('position', None)
+            # strip visual-only from core
+            core_nodes.append(nd)
+            layout_nodes.append({'id': n['id'], 'position': pos or {'x':0,'y':0}, 'visual': {
+                'size_factor': (n.get('metadata') or {}).get('size_factor', 1),
+                'color': (n.get('metadata') or {}).get('color')
+            }})
+        viz_core = {'metadata': {'project': project}, 'nodes': core_nodes, 'edges': merged_edges}
+        viz_layout = {'metadata': viz['metadata']['layout'], 'nodes': layout_nodes}
+        (out_dir / 'viz_core.json').write_text(json.dumps(viz_core, indent=2), encoding='utf-8')
+        (out_dir / 'viz_layout.json').write_text(json.dumps(viz_layout, indent=2), encoding='utf-8')
+    except Exception:
+        pass
+
+    return viz
 
 def convert_analysis_result_to_frontend_format(analysis_result):
     """Convert our backend analysis result to the frontend format with enhanced metadata"""
@@ -272,6 +750,52 @@ def convert_analysis_result_to_frontend_format(analysis_result):
         return None
     
     graph = analysis_result['graph']
+
+    # Emit AST split artifacts (core + meta)
+    try:
+        codebase_path = analysis_result.get('codebase_path') or ''
+        project = Path(codebase_path).name or 'project'
+        out_dir = Path('graph') / project / 'exports'
+        out_dir.mkdir(parents=True, exist_ok=True)
+        # Core: implementation symbols and call/import edges
+        ast_nodes = []
+        for n in getattr(graph, 'nodes', []):
+            lvl = (n.level.value if hasattr(n.level,'value') else str(n.level))
+            if lvl != 'IMPLEMENTATION':
+                continue
+            ast_nodes.append({
+                'id': n.id,
+                'name': n.name,
+                'level': lvl,
+                'type': (n.type.value if hasattr(n.type,'value') else str(n.type)),
+                'files': list(n.files or []),
+                'classes': list(n.classes or []),
+                'functions': list(n.functions or [])
+            })
+        ast_edges = []
+        for e in getattr(graph, 'edges', []):
+            t = (e.type.value if hasattr(e.type,'value') else str(e.type))
+            if t in ('calls','imports'):
+                ast_edges.append({'from': e.from_node, 'to': e.to_node, 'type': t})
+        (out_dir / 'ast_core.json').write_text(json.dumps({'nodes': ast_nodes, 'edges': ast_edges}, indent=2), encoding='utf-8')
+        # Meta: per-symbol metrics
+        ast_meta = []
+        for n in getattr(graph, 'nodes', []):
+            lvl = (n.level.value if hasattr(n.level,'value') else str(n.level))
+            if lvl != 'IMPLEMENTATION':
+                continue
+            md = n.metadata or None
+            ast_meta.append({
+                'id': n.id,
+                'paths': list(n.files or []),
+                'line_count': getattr(md,'line_count', None) if md else None,
+                'file_size': getattr(md,'file_size', None) if md else None,
+                'language': getattr(md,'language', None) if md else None,
+                'complexity': (md.complexity.value if md and hasattr(md,'complexity') and hasattr(md.complexity,'value') else (str(md.complexity) if md and hasattr(md,'complexity') else None))
+            })
+        (out_dir / 'ast_meta.json').write_text(json.dumps({'nodes': ast_meta}, indent=2), encoding='utf-8')
+    except Exception:
+        pass
     
     # Convert nodes to frontend format with enhanced metadata
     nodes = []

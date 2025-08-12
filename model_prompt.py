@@ -5,70 +5,25 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 
-TEMPLATE_JSON = {
-    "metadata": {
-        "source_ast_graph_version": "1.x",
-        "generated_at": "",
-        "codebase_path": "",
-        "rules_version": "v1",
-        "layout": {
-            "y_layers": [150, 230, 310, 390, 470, 550],
-            "levels": {"BUSINESS": [150, 230], "SYSTEM": [310, 390], "IMPLEMENTATION": [470, 550]},
-            "ordering": "degree_center",
-            "deterministic": True,
-        },
-        "counters": {
-            "business_nodes": 0,
-            "system_nodes": 0,
-            "implementation_nodes": 0,
-            "edges": 0,
-            "coverage_pct": 0,
-        },
-    },
-    "nodes": [],
-    "edges": [],
-    "legend": {
-        "node_kinds": [
-            "Domain",
-            "Actor",
-            "Service",
-            "Module",
-            "Database",
-            "Message_Bus",
-            "Queue",
-            "Cache",
-            "Storage",
-            "Search",
-            "Scheduler",
-            "External_API",
-            "LLM_Service",
-            "Auth_Provider",
-            "File",
-            "Class",
-            "Function_Group",
-        ],
-        "edge_types": ["contains", "depends_on", "calls"],
-        "style": {
-            "nodes": {
-                "BUSINESS": {"fill": "#E8EEF7", "border": "#2B3A55"},
-                "SYSTEM": {"fill": "#F6E9EA", "border": "#5A2E35"},
-                "IMPLEMENTATION": {"fill": "#EEF3EE", "border": "#2E4B2F"},
-            },
-            "edges": {
-                "contains": {"color": "#2E7D32", "style": "solid", "opacity_default": 0.2},
-                "depends_on": {"color": "#1565C0", "style": "dashed", "opacity_default": 0.2},
-                "calls": {"color": "#EF6C00", "style": "dotted", "opacity_default": 0.2},
-            },
-            "label_policy": "hidden_by_default_show_on_highlight",
-        },
-    },
+ENRICHMENT_SCHEMA = {
+    "schema_version": "viz-enrich-1",
+    "nodes": [
+        {
+            "id": "string",
+            "name": "string?",
+            "summary": "string?",
+            "responsibilities": ["string"],
+            "interfaces": ["string"],
+            "top_dependencies": ["string"]
+        }
+    ]
 }
 
 
 SYSTEM_PROMPT = (
-    "You transform an AST graph into a standardized visualization-graph. "
-    "Do not invent edges. Group and name modules deterministically. "
-    "Strictly output JSON matching the provided schema, and compute positions using the fixed six y-layers."
+    "You enrich Business/System nodes with human-friendly names and concise summaries. "
+    "Do NOT invent nodes or relationships. Do NOT change ids. "
+    "Output JSON matching the schema exactly; strings must be short and business-facing."
 )
 
 
@@ -77,11 +32,39 @@ def load_ast_graph(path: Path) -> dict:
         return json.load(f)
 
 
-def build_prompt(schema: dict, ast_graph: dict) -> str:
-    return (
-        "Schema (must match exactly):\n" + json.dumps(schema, ensure_ascii=False) +
-        "\n\nAST graph:\n" + json.dumps(ast_graph, ensure_ascii=False)
-    )
+def build_prompt(schema: dict, viz_core: dict) -> str:
+    # Build compact enrichment input from viz_core
+    nodes = []
+    # Precompute light neighbor map (top weights if present)
+    neighbors = {}
+    for e in viz_core.get("edges", []):
+        if e.get("type") != "depends_on":
+            continue
+        src = e.get("from_node"); dst = e.get("to_node")
+        neighbors.setdefault(src, []).append({"id": dst, "weight": (e.get("metadata") or {}).get("weight", 1)})
+    name_lookup = { n.get("id"): n.get("name") for n in viz_core.get("nodes", []) }
+    for n in viz_core.get("nodes", []):
+        lvl = n.get("level");
+        if lvl not in ("BUSINESS","SYSTEM"):
+            continue
+        node = {
+            "id": n.get("id"),
+            "level": lvl,
+            "component_kind": n.get("type"),
+            "current_name": n.get("name"),
+            "member_samples": (n.get("files") or [])[:5],
+            "neighbor_systems": [
+                {"id": m.get("id"), "name": name_lookup.get(m.get("id")), "weight": m.get("weight")}
+                for m in sorted(neighbors.get(n.get("id"), []), key=lambda x: -x.get("weight",1))[:3]
+            ]
+        }
+        nodes.append(node)
+    payload = {
+        "schema": schema,
+        "immutable": ["id","level"],
+        "nodes_for_enrichment": nodes
+    }
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def call_openai(prompt: str) -> dict:
@@ -104,23 +87,15 @@ def call_openai(prompt: str) -> dict:
 
 
 def main():
-    # Locate the last AST export if present; else read path from argv
-    default_ast = Path("graph").glob("**/autograph_graph_*.json")
-    ast_path = None
-    try:
-        ast_path = max(default_ast, key=lambda p: p.stat().st_mtime)
-    except ValueError:
-        raise SystemExit("No AST graph found under ./graph. Provide one first.")
-
-    ast_graph = load_ast_graph(ast_path)
-    prompt = build_prompt(TEMPLATE_JSON, ast_graph)
-    viz = call_openai(prompt)
-
-    out_dir = Path("graph") / "viz"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_file = out_dir / (ast_path.stem.replace("autograph_graph_", "viz_graph_") + ".json")
-    with out_file.open("w", encoding="utf-8") as f:
-        json.dump(viz, f, indent=2)
+    # Load latest viz_core.json under exports
+    candidates = sorted(Path("graph").glob("**/exports/viz_core.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not candidates:
+        raise SystemExit("No viz_core.json found. Run analysis first.")
+    viz_core = json.loads(candidates[0].read_text(encoding='utf-8'))
+    prompt = build_prompt(ENRICHMENT_SCHEMA, viz_core)
+    enriched = call_openai(prompt)
+    out_file = candidates[0].with_name('viz_meta.json')
+    out_file.write_text(json.dumps(enriched, indent=2), encoding='utf-8')
     print(str(out_file))
 
 

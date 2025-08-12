@@ -1,63 +1,52 @@
-# AutoGraph – Unified Codebase Graph (BSI) & Visualization
+# AutoGraph — Canonical Graphs for Real Codebases
 
 ## Overview
-AutoGraph transforms complex codebases into actionable business intelligence. It automatically analyzes any codebase and generates comprehensive architecture maps with AI component detection, risk assessment, and compliance reporting - making technical complexity accessible to business stakeholders. **Particularly powerful for fintech systems requiring explainability, transparency, and regulatory compliance.**
+AutoGraph analyzes a repository and emits two artifacts:
+- AST graph: exhaustive, low-level implementation structure
+- Visualization graph (BSI): Business/System/Implementation view with deterministic positions and structured metadata for PM/consultant readability
 
 ## Project Status
-Currently in **Phase 1–2 (BSI core + clustering)** – single canonical JSON graph, deterministic layout, UI filters.
+Focusing on core extraction and representation using `vizro-core` as the target. UI is minimal; no extra exports/tests until the graph JSONs are stable.
 
-## Key Business Value
-- **AI Component Detection**: Automatically identifies and assesses AI/ML components in codebases
-- **Risk Assessment**: Categorizes components by business risk level (high/medium/low)
-- **Compliance Reporting**: Generates enterprise-ready reports for SOC2, HIPAA, GDPR, SOX, and PCI
-- **Business Context**: Provides PM-friendly metrics including business value, development status, and stakeholder priorities
-- **Real-time Analysis**: Live progress tracking with drag-and-drop interface
-- **JSON Export** only (others deferred)
+## What the VIZ graph guarantees
+- Levels: BUSINESS (1 band), SYSTEM (3 bands), IMPLEMENTATION (8 bands)
+- Edge types: `contains`, `depends_on`, `calls`
+- Positions: absolute preset layout; 12 y-anchors embedded in `metadata.layout`
+- Metadata: structured module facts for nodes; edge `intent` with examples
+- Externals: explicit nodes (User, External_API, LLM_Service, Auth_Provider, etc.)
 
 ## Installation
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd vc-one
-
 # Install dependencies
 pip install -r requirements.txt
 
-# Set up environment (optional)
-cp .env.example .env
-# Edit .env with your OpenAI API key
+# Optional: set OPENAI_API_KEY for enrichment
 ```
 
 ## Usage
-
-### Web Application (Recommended)
+### Web Application
 ```bash
 # Start the web application
 python run_web.py
 
-# Open your browser to: http://localhost:5000
-# Upload a codebase and view the interactive graph
+# Open http://localhost:5000 and upload a codebase (try vizro-core)
 ```
 
-### Command Line (Legacy)
-```bash
-# Analyze a codebase
-python -m src.main --codebase /path/to/your/codebase
-
-# Output will be saved to /graph/ directory
-```
+### Outputs
+- `graph/<project>/exports/ast_graph.json`
+- `graph/<project>/exports/viz_graph.json`
 
 ## Project Structure
 ```
-vc-one/
+Auto-Graph/
 ├── run_web.py                   # Main web application entry point
 ├── src/                         # Source code
 │   ├── parser/                  # AST parsing and symbol extraction
 │   ├── analyzer/                # Codebase analysis and traversal
 │   ├── llm_integration/         # LLM-powered semantic analysis
 │   ├── graph_builder/           # Graph construction and management
-│   ├── export/                  # Multi-format export functionality
-│   ├── visualization/           # Graph visualization components
+│   ├── export/                  # JSON export (others deferred)
+│   ├── visualization/           # Graph visualization helpers
 │   ├── config/                  # Configuration management
 │   ├── web/                     # Flask web application
 │   └── utils/                   # Utilities and helpers
@@ -68,28 +57,14 @@ vc-one/
 └── examples/                    # Sample codebases for testing
 ```
 
-## Development Phases (BSI)
-- Phase 1: BSI schema + UI alignment (current)
-- Phase 2: System clustering + depends_on rollups
-- Phase 3: Visual polish (bounding boxes, grid-snap), optional metrics
-- Phase 4: UX extras and optional exports
+## Roadmap (condensed)
+- Phase A: Stable positions embedded in VIZ export
+- Phase B: Module facts + externals + edge intents populated
+- Phase C: System-level depends_on rollups; raw calls only at implementation
+- Phase D: Schema-locked LLM summaries for Business/System nodes
 
-## Business Impact & Performance
-
-### Key Metrics
-- **59 nodes, 1288 edges** generated from enterprise fintech platform
-- **90%+ accuracy** in AI component detection
-- **<30 seconds** analysis time for typical codebases
-- **6 export formats** for different stakeholder needs
-- **Real-time progress tracking** with business-friendly interface
-
-### Enterprise Features
-- ✅ **AI Component Detection**: Identifies OpenAI, LangChain, Anthropic, and custom AI patterns
-- ✅ **Risk Assessment**: Business risk categorization for all components
-- ✅ **Compliance Reporting**: SOC2, HIPAA, GDPR, SOX, and PCI report generation
-- ✅ **Business Context**: PM-friendly metrics and stakeholder priorities
-- ✅ **Web Interface**: Drag-and-drop analysis with real-time updates
-- ✅ **Multi-format Export**: JSON, YAML, CSV, DOT, HTML, and Mermaid outputs
+## Notes
+- HLD/LLD is a peer view produced by HLDBuilder from our AST/VIZ exports. It is not the old legacy mode.
 
 ## Upcoming Features (Phase 5)
 
@@ -107,44 +82,11 @@ vc-one/
 - **Strategic Planning Tools**: Long-term architecture planning and roadmapping
 
 ## Configuration
-
-### Environment Variables
-Create a `.env` file with the following variables:
-```bash
-# OpenAI API Configuration
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4o-mini
-
-# LLM Analysis Configuration
-LLM_ENABLED=true
-LLM_CACHE_ENABLED=true
-LLM_MAX_TOKENS=2000
-LLM_TEMPERATURE=0.1
-LLM_DISABLE_FOR_TESTING=false
-```
+- `OPENAI_API_KEY`: optional; enables schema-locked enrichment for Business/System node summaries.
 
 ## Use Cases
-
-### For Product Managers
-- **Architecture Reviews**: Understand system complexity and business impact
-- **Risk Assessment**: Identify high-risk components and plan mitigation strategies
-- **Stakeholder Communication**: Generate business-friendly reports for executives
-- **Development Planning**: Assess team capacity and project timelines
-- **Fintech Explainability**: Ensure regulatory compliance and system transparency
-
-### For Engineering Leaders
-- **Codebase Health**: Monitor technical debt and architectural complexity
-- **AI Strategy**: Track AI component adoption and assess business value
-- **Compliance Management**: Ensure regulatory compliance for AI systems
-- **Team Productivity**: Analyze development patterns and optimize workflows
-- **System Explainability**: Document decision logic for regulatory requirements
-
-### For Compliance Officers
-- **Regulatory Reporting**: Generate compliance reports for various frameworks
-- **Risk Monitoring**: Track AI component risks and compliance status
-- **Audit Preparation**: Prepare comprehensive audit documentation
-- **Policy Enforcement**: Monitor adherence to AI governance policies
-- **Fintech Compliance**: Ensure Basel III, FINRA, SEC, and other financial regulations
+- PM/Consultant overview (VIZ graph)
+- Engineer drill-down (AST graph + Implementation layer)
 
 ## Contributing
 Please read the `Software_Requirements.md` for detailed development guidelines and safety practices.
@@ -155,21 +97,11 @@ Please read the `Software_Requirements.md` for detailed development guidelines a
 - **Compliance Ready**: Ensure all features support enterprise compliance requirements
 - **Performance**: Optimize for large enterprise codebases and real-time analysis
 
-## Testing
-```bash
-# Run all tests
-python -m pytest tests/
-
-# Run integration tests
-python test_integration.py
-
-# Test web application
-python run_web.py
-# Then upload a sample codebase in the browser
-```
+## Quick test
+Upload `vizro-core` and verify the export files under `graph/vizro-core/exports/`.
 
 ## Export
-- **JSON** (canonical)
+- JSON only (canonical)
 
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.

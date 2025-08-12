@@ -100,7 +100,7 @@
 
 ### Final Graph Object Shape
 ```json
-{ "metadata": {"codebase_path": "...", "analysis_timestamp": "..."}, "nodes": [], "edges": [] }
+{ "metadata": {"codebase_path": "...", "analysis_timestamp": "...", "layout": {"rows":12, "bands": {"business":[1], "system":[2,3,4], "implementation":[5,6,7,8,9,10,11,12]}, "anchors_px": [120,200,280,360,440,520,600,680,760,840,920,1000]}}, "nodes": [], "edges": [] }
 ```
 
 ## Grounding Example: todo_flask_app (real-world small app)
@@ -166,8 +166,9 @@ Location: `examples/real_world/todo_flask_app/`
 ```
 
 ### Deterministic Positioning Checks (jq)
-- y-layers must be exactly `[150,230,310,390,470,550]`:
-  - `curl -s /api/analysis/<id>/graph | jq -r '[.nodes[].position.y] | unique | sort | @json'`
+- anchors length must be `12`, bands must match `1/3/8`:
+  - `curl -s /api/analysis/<id>/graph | jq '.metadata.layout.anchors_px | length'`
+  - `curl -s /api/analysis/<id>/graph | jq '.metadata.layout.bands'`
 - Edge-type list should be subset of `["contains","depends_on","calls"]`:
   - `curl -s /api/analysis/<id>/graph | jq -r '[.edges[].type] | unique | sort | @json'`
 - Depth toggle must not change positions; only counts change.
