@@ -19,3 +19,9 @@ pathlib2>=2.3.0
 
 # Web Framework
 Flask>=2.3.0 
+ 
+# Workflow Orchestration
+langgraph>=0.2.0
+langchain-core>=0.2.0
+tenacity>=8.4.1
+langgraph-checkpoint-sqlite>=0.1.0

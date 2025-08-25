@@ -19,6 +19,11 @@ try:
     from models.schemas import NodeLevel, NodeType, ComplexityLevel
     from utils.logger import get_logger
     from export.enhanced_exporter import EnhancedExporter
+    # Optional: LangGraph workflow orchestrator
+    try:
+        from workflows.langgraph_pipeline import create_workflow
+    except Exception:
+        create_workflow = None
 except ImportError as e:
     print(f"Import error: {e}")
     print("Trying alternative import paths...")
@@ -29,6 +34,10 @@ except ImportError as e:
         from src.models.schemas import NodeLevel, NodeType, ComplexityLevel
         from src.utils.logger import get_logger
         from src.export.enhanced_exporter import EnhancedExporter
+        try:
+            from src.workflows.langgraph_pipeline import create_workflow
+        except Exception:
+            create_workflow = None
     except ImportError as e2:
         print(f"Alternative import also failed: {e2}")
         raise
@@ -1093,22 +1102,48 @@ def upload_analysis():
             'logs': []
         }
         
-        # Start analysis in background (for now, we'll do it synchronously)
+        # Start analysis (synchronously). Feature flag to route via LangGraph.
         try:
-            logger.info(f"Starting analysis for {analysis_id}")
+            engine = (request.form.get('engine') or request.args.get('engine') or os.getenv('AUTOGRAPH_PIPELINE') or '').strip().lower()
+            use_langgraph = engine == 'langgraph'
+            logger.info(f"Engine selection for {analysis_id}: {'langgraph' if use_langgraph else 'legacy'}")
             analysis_sessions[analysis_id]['message'] = 'Analyzing codebase...'
             analysis_sessions[analysis_id]['progress'] = 25
-            
-            # Use our existing analyzer
-            analyzer = CodebaseAnalyzer()
-            result = analyzer.analyze_codebase(temp_dir)
-            
-            # Convert to frontend format (AST-level)
-            frontend_data = convert_analysis_result_to_frontend_format(result)
-            # Bake visualization-draft (contains + pruned depends_on + positions)
-            if frontend_data:
-                frontend_data = _build_viz_from_frontend(frontend_data, temp_dir)
-            
+
+            if use_langgraph and create_workflow is not None:
+                # LangGraph path: identical inner steps but orchestrated as a workflow
+                try:
+                    project_name = Path(temp_dir).name
+                    runs_dir = Path('graph') / project_name / 'runs'
+                    runs_dir.mkdir(parents=True, exist_ok=True)
+                    checkpointer = str(runs_dir / 'checkpoints.sqlite')
+                except Exception:
+                    project_name = 'project'
+                    checkpointer = None
+
+                app = create_workflow(project_name=project_name, analysis_id=analysis_id, checkpointer_path=checkpointer)
+                initial_state = {
+                    'upload_temp_dir': temp_dir,
+                    'analysis_id': analysis_id,
+                    'flags': {
+                        'deterministic': True,
+                        'use_llm': bool(os.getenv('OPENAI_API_KEY')) and (os.getenv('USE_LLM', '0') in {'1','true','yes'}),
+                        'engine': 'langgraph'
+                    },
+                    'logs': [],
+                    'progress': 10,
+                    'message': 'Initialized'
+                }
+                result_state = app.invoke(initial_state, config={'configurable': {'thread_id': analysis_id}})
+                frontend_data = result_state.get('viz_graph')
+            else:
+                # Legacy path: keep existing behavior exactly
+                analyzer = CodebaseAnalyzer()
+                result = analyzer.analyze_codebase(temp_dir)
+                frontend_data = convert_analysis_result_to_frontend_format(result)
+                if frontend_data:
+                    frontend_data = _build_viz_from_frontend(frontend_data, temp_dir)
+
             if frontend_data:
                 analysis_results[analysis_id] = frontend_data
                 analysis_sessions[analysis_id]['status'] = 'completed'
@@ -1119,7 +1154,7 @@ def upload_analysis():
                 analysis_sessions[analysis_id]['status'] = 'error'
                 analysis_sessions[analysis_id]['message'] = 'Failed to process analysis result'
                 logger.error(f"Analysis failed for {analysis_id}")
-                
+
         except Exception as e:
             logger.error(f"Analysis error for {analysis_id}: {str(e)}")
             analysis_sessions[analysis_id]['status'] = 'error'
